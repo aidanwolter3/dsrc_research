@@ -25,7 +25,7 @@ void con_initialize() {
 		ROM_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
 
 		//configure the UART for 115,200, 8-N-1 operation.
-		ROM_UARTConfigSetExpClk(UART0_BASE, ROM_SysCtlClockGet(), 115200,
+		ROM_UARTConfigSetExpClk(UART0_BASE, ROM_SysCtlClockGet(), 9600,
 								(UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE |
 								 UART_CONFIG_PAR_NONE));
 		initialized = 1;

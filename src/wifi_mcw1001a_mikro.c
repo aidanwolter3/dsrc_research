@@ -27,6 +27,7 @@ void            wifi_put_packet(WIFI_PACKET *p);
 WIFI_PACKET*        wifi_get_packet();
 void            wifi_print_packet(WIFI_PACKET *p);
 bool            wifi_wait_for_response(uint16_t packet_type);
+bool            wifi_wait_for_event_response(uint16_t event_type);
 
 //private variables
 WIFI_PACKET_NETWORK_STATUS        wifi_network_status;
@@ -144,13 +145,10 @@ void wifi_set_cp_security_open(WIFI_CP cp) {
 
 //connection
 void wifi_connect(WIFI_CP cp) {
-  bool ret = false;
-  while(ret == false) {
-    uint16_t data;
-    ((uint8_t*)&data)[0] = cp;
-    wifi_send_basic_packet(WIFI_PACKET_TYPE_WIFI_CONNECT_MSG, WIFI_PACKET_TYPE_ACK, 2, (uint8_t*)&data);
-    ret = wifi_wait_for_response(WIFI_PACKET_TYPE_EVENT);
-  }
+  uint16_t data;
+  ((uint8_t*)&data)[0] = cp;
+  wifi_send_basic_packet(WIFI_PACKET_TYPE_WIFI_CONNECT_MSG, WIFI_PACKET_TYPE_ACK, 2, (uint8_t*)&data);
+  wifi_wait_for_event_response(WIFI_PACKET_TYPE_EVENT_WIFI_STATUS_CHANGED);
 }
 
 void wifi_disconnect() {
@@ -227,8 +225,40 @@ bool wifi_wait_for_response(uint16_t packet_type) {
   return false;
 }
 
+bool wifi_wait_for_event_response(uint16_t event_type) {
+  WIFI_PACKET *p;
+  while(task_wait_for_event_wto(TASK_EVENT_WIFI, 100) == true) {
+    bool correct_response_found = false;
+
+    //process all available wifi packets
+    p = wifi_get_packet();
+    while(p != NULL) {
+      if((p->type & ~WIFI_PACKET_TYPE_PIGGYBACKBIT) == WIFI_PACKET_TYPE_EVENT &&
+          p->data[0] == event_type) {
+        correct_response_found = true;
+      }
+      wifi_process_packet(p);
+      free(p->data);
+      free(p);
+      p = wifi_get_packet();
+    }
+    task_clear_event(TASK_EVENT_WIFI);
+
+    //found the correct response so stop waiting
+    if(correct_response_found == true) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void wifi_put_packet(WIFI_PACKET *p) {
+
+#if SHOW_WIFI_PACKETS
+  con_printf("-> ");
   wifi_print_packet(p);
+#endif
+
   uint8_t *data = malloc((7+(p->len))*sizeof(char));
   data[0] = 0x55; //header
   data[1] = 0xAA;
@@ -337,13 +367,17 @@ WIFI_PACKET* wifi_get_packet() {
 void wifi_print_packet(WIFI_PACKET *p) {
   if(p != NULL) {
     char *str = malloc(256*sizeof(char));
-    con_println("IN");
-    sprintf(str, "packet: {type: %d, len: %d, data: 0x%x 0x%x 0x%x ...}",
+    sprintf(str, "packet: {type: %d, len: %d, data: ",
         p->type,
-        p->len,
-        p->data[0],
-        p->data[1],
-        p->data[2]);
+        p->len);
+    
+    int i;
+    for(i = 0; i < p->len; i++) {
+      sprintf(str+strlen(str), "0x%x ", p->data[i]);
+    }
+
+    sprintf(str+strlen(str), "}");
+
     con_println(str);
     free(str);
   }
@@ -354,6 +388,12 @@ void wifi_print_packet(WIFI_PACKET *p) {
 //2. check that the size is correct based on the type
 //3. parse the data and save
 PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
+
+#if SHOW_WIFI_PACKETS
+  con_printf("<- ");
+  wifi_print_packet(p);
+#endif
+
   switch(p->type & ~WIFI_PACKET_TYPE_PIGGYBACKBIT) {
     case WIFI_PACKET_TYPE_ACK: {
       if(p->len != 0) {
@@ -398,7 +438,7 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
                                 wifi_network_status.gateway[2],
                                 wifi_network_status.gateway[3]);
       con_println(status_str);
-      sprintf(status_str, "    status : %d", wifi_network_status.status);
+      sprintf(status_str, "    status : %d\n", wifi_network_status.status);
       con_println(status_str);
 
       break;

@@ -6,6 +6,7 @@
  */
 
 #include "task_manager.h"
+#include "console.h"
 
 //indicates the dirty tasks to be triggered
 //size should be updated depending on the number of events available

@@ -57,6 +57,8 @@ CFLAGS     += -Dgcc
 CFLAGS     += -DTARGET_IS_TM4C123_RB1
 CFLAGS     += -fsingle-precision-constant
 CFLAGS     += -I$(TIVAWARE) $(INCLUDES)
+
+CFLAGS     += -g
 LDFLAGS    += -T $(LD_SCRIPT)
 LDFLAGS    += --entry ResetISR
 LDFLAGS    += --gc-sections
@@ -90,9 +92,6 @@ MKDIR       = mkdir -p
 LIBGCC			= $(TOOL)/lib/gcc/arm-none-eabi/4.7.3/thumb/cortex-m4/libgcc.a
 LIBC				= $(TOOL)/arm-none-eabi/lib/thumb/cortex-m4/libc.a
 LIBM				= $(TOOL)/arm-none-eabi/lib/thumb/cortex-m4/libm.a
-#LIBGCC      = ${shell ${CC} ${CFLAGS} -print-libgcc-file-name}
-#LIBC        = ${shell ${CC} ${CFLAGS} -print-file-name=libc.a}
-#LIBM        = ${shell ${CC} ${CFLAGS} -print-file-name=libm.a}
 DRIVER_LIB	= $(TIVAWARE)/driverlib/gcc/libdriver.a
 LIBS        = '$(LIBM)' '$(LIBC)' '$(LIBGCC)' '$(DRIVER_LIB)'
 
@@ -101,8 +100,15 @@ LIBS        = '$(LIBM)' '$(LIBC)' '$(LIBGCC)' '$(DRIVER_LIB)'
 ###############################################################################
 all: dirs bin/$(TARGET).bin size
 
-screen: install
+screen: flash
 	screen /dev/tty.usbmodem0E20F341 115200
+
+openocd:
+	openocd -f board/ek-tm4c123gxl.cfg
+
+debug: all
+	arm-none-eabi-gdb bin/${TARGET}.axf -ex "target extended-remote :3333; monitor reset halt; monitor reset init;"
+	#ps | grep openocd | grep -v grep | awk '{print "kill -9 " $1}' | sh
 
 asm: $(ASMS)
 
@@ -171,7 +177,7 @@ clean:
 	-$(RM) bin/*
 
 # Flash The Board
-install: all
+flash: all
 	@if [ 'x${VERBOSE}' = x ];                                                \
 	 then                                                                     \
 	     echo "  FLASH    bin/$(TARGET).bin";                                 \

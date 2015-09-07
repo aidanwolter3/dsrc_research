@@ -17,14 +17,7 @@ SECTIONS
         _etext = .;
     } > FLASH
 
-    /*.ARM.exidx : AT(ADDR(.text) + SIZEOF(.text))
-    {
-        *(.ARM.exidx*)
-        *(.gnu.linkonce.armexidx.*)
-    }*/
-
     .data : AT(ADDR(.text) + SIZEOF(.text))
-    /*.data : AT(ADDR(.text) + SIZEOF(.text))*/
     {
         _data = .;
         *(vtable)
