@@ -71,6 +71,29 @@ typedef struct {
   uint8_t allocated_count;
 } WIFI_PACKET_SOCKET_ALLOCATE_RESPONSE;
 
+//wifi socket receive from response packet
+typedef struct {
+  uint8_t socket_handle;
+  uint8_t RESERVED;
+  uint16_t size;
+  uint8_t *data;
+} WIFI_PACKET_SOCKET_RECV_RESPONSE;
+
+//wifi socket receive from response packet
+typedef struct {
+  uint8_t socket_handle;
+  uint8_t RESERVED;
+  uint16_t remote_port;
+  uint8_t remote_ip[16];
+  uint16_t size;
+  uint8_t *data;
+} WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE;
+
+//wifi socket send to response packet
+typedef struct {
+  uint16_t size;
+} WIFI_PACKET_SOCKET_SEND_TO_RESPONSE;
+
 //connection profiles
 typedef enum {
   WIFI_CP1 = 1,
@@ -99,6 +122,8 @@ Constants
 
 #define WIFI_SOCKET_HANDLE_INVALID                        254
 #define WIFI_SOCKET_HANDLE_UNKOWN                         255
+
+#define WIFI_PACKET_TYPE_NONE                             0xFFFF
 
 //ack
 #define WIFI_PACKET_TYPE_ACK                              0
@@ -248,9 +273,9 @@ void wifi_socket_connect();
 void wifi_socket_listen();
 void wifi_socket_accept();
 void wifi_socket_send();
-void wifi_socket_recv();
-void wifi_socket_send_to();
-void wifi_socket_recv_from();
+void wifi_socket_recv(uint8_t socket_handle, uint16_t len);
+void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *remote_ip, uint16_t len, uint8_t *data);
+void wifi_socket_recv_from(uint8_t socket_handle, uint16_t len);
 void wifi_socket_allocate();
 
 #endif //WIFI_MCW1001A_MIKRO_H_
