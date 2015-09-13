@@ -17,6 +17,7 @@ typedef enum {
 	TASK_EVENT_WIFI,
   TASK_EVENT_WIFI_START,
 	TASK_EVENT_TIMER0,
+	TASK_EVENT_TIMER1,
 	TASK_EVENT_END
 } TASK_EVENT;
 
@@ -28,7 +29,8 @@ bool task_wait_for_event_wto(TASK_EVENT e, uint32_t ms);
 uint8_t task_get_events();
 
 //timers
-#define TIMER_CNT 1
+#define TIMER_CNT 2
 void task_start_timer0(TASK_EVENT e, uint32_t us);
+void task_start_timer1(TASK_EVENT e, uint32_t us);
 
 #endif //TASK_MANAGER_H_

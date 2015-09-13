@@ -30,14 +30,20 @@ uint32_t device_color = RED_LED;
 
 //wifi configurations
 WIFI_NETWORK_MODE network_mode = WIFI_NETWORK_MODE_ADHOC;
-uint8_t channels[] = {1,2,3,4,5,6,7,8,9,10,11};
-uint8_t ip[16] = {0xA9, 0xFE, 0x01, 0x01};
-uint8_t netmask[16] = {0xFF, 0xFF, 0xFF, 0x00};
-uint8_t gateway[16] = {0xA9, 0xFE, 0x01, 0x01};
-uint8_t mac[6] = {0x22, 0x33, 0x44, 0x55, 0x66, 0x00};
-uint16_t arp_time = 1;
-uint16_t local_port = 10002;
-uint8_t socket_handle = 0xFF;
+uint8_t channels[]    = {1,2,3,4,5,6,7,8,9,10,11};
+uint8_t ip[16]        = {0xA9, 0xFE, 0x00, 0x01};
+uint8_t remote_ip[16] = {0xFF, 0xFF, 0xFF, 0xFF}; // broadcast to all
+uint8_t netmask[16]   = {0xFF, 0xFF, 0x00, 0x00};
+uint8_t gateway[16]   = {0xA9, 0xFE, 0x00, 0x01};
+uint8_t mac[6]        = {0x22, 0x33, 0x44, 0x55, 0x66, 0x00};
+uint16_t arp_time     = 5;
+
+uint16_t rx_local_port    = 10002;
+uint16_t tx_local_port    = 10003;
+uint16_t rx_remote_port   = 10003;
+uint16_t tx_remote_port   = 10002;
+uint8_t rx_socket_handle  = 0xFF;
+uint8_t tx_socket_handle  = 0xFF;
 
 void port_f_handler() {
   if(device_color == RED_LED) {
@@ -88,7 +94,9 @@ int main(void) {
   WIFI_PACKET_NETWORK_STATUS network_status = wifi_get_network_status();
   if(network_status.status == WIFI_NETWORK_STATUS_CONNECTED_STATIC_IP ||
      network_status.status == WIFI_NETWORK_STATUS_CONNECTED_DHCP) {
+    con_println("DISCONNECTING");
     wifi_disconnect();
+    wifi_get_network_status();
   }
 #endif
 
@@ -99,39 +107,46 @@ int main(void) {
   //save the led state
   bool led_on = false;
 
-  //start the periodic timer
+  //start the periodic timers
   task_start_timer0(TASK_EVENT_TIMER0, 1000000);
+  task_start_timer1(TASK_EVENT_TIMER1, 10000);
 
   while(1) {
     task_wait_for_event_wto(TASK_EVENT_ANY, 100);
     uint8_t events = task_get_events();
 
+    //parse the incoming gps buffer
     if(isbitset(events, TASK_EVENT_GPS) == true) {
       gps_parse_buffer();
       task_clear_event(TASK_EVENT_GPS);
     }
+
+    //parse the incoming wifi buffer
     if(isbitset(events, TASK_EVENT_WIFI) == true) {
       wifi_parse_buffer();
       task_clear_event(TASK_EVENT_WIFI);
     }
+
+    //1Hz timer
     if(isbitset(events, TASK_EVENT_TIMER0) == true) {
 
       #if WIFI_PRESENT
-      if(device_color == BLUE_LED) { //TRANSMITTER
-        if(socket_handle != 0xFF) {
-          uint16_t remote_port = 10002;
-          uint8_t remote_ip[16] = {0xA9, 0xFE, 0x01, 0x03};
+      if(tx_socket_handle != 0xFF) {
+        char *str = malloc(256*sizeof(char));
+        if(device_color == GREEN_LED) {
+          uint16_t len = 5;
+          uint8_t data[] = {'g', 'r', 'e', 'e', 'n'};
+          wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
+          sprintf(str, "tx %d:%d:%d:%d : green", remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3]);
+        }
+        else {
           uint16_t len = 4;
-          uint8_t data[] = {'t', 'e', 's', 't'};
-          //WIFI_PACKET_SOCKET_SEND_TO_RESPONSE send_response;
-          wifi_socket_send_to(socket_handle, remote_port, remote_ip, len, data);
+          uint8_t data[] = {'b', 'l', 'u', 'e'};
+          wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
+          sprintf(str, "tx %d:%d:%d:%d : blue", remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3]);
         }
-      }
-      else if(device_color == GREEN_LED) { //RECEIVER
-        if(socket_handle != 0xFF) {
-          //WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE recv_response;
-          wifi_socket_recv_from(socket_handle, 100);
-        }
+        con_println(str);
+        free(str);
       }
       #endif
 
@@ -163,6 +178,20 @@ int main(void) {
 
       task_clear_event(TASK_EVENT_TIMER0);
     }
+
+    //100Hz timer
+    if(isbitset(events, TASK_EVENT_TIMER1) == true) {
+
+      #if WIFI_PRESENT
+      if(rx_socket_handle != 0xFF) {
+        wifi_socket_recv_from(rx_socket_handle, 2);
+      }
+      #endif
+
+      task_clear_event(TASK_EVENT_TIMER1);
+    }
+
+    //configure and connect to the network
     if(isbitset(events, TASK_EVENT_WIFI_START) == true) {
       wifi_configure();
       wifi_start();
@@ -186,7 +215,7 @@ void wifi_configure() {
   wifi_set_gateway(gateway);
   wifi_set_mac(mac);
   wifi_set_arp_time(arp_time);
-  wifi_set_list_retry_count(5, 1);
+  wifi_set_list_retry_count(255, 5);
 
   wifi_get_network_status();
 
@@ -201,9 +230,10 @@ void wifi_start() {
   wifi_connect(WIFI_CP1);
 
   //start udp socket connection
-  socket_handle = wifi_socket_create(WIFI_SOCKET_TYPE_UDP);
-  wifi_socket_bind(local_port, socket_handle);
-
+  rx_socket_handle = wifi_socket_create(WIFI_SOCKET_TYPE_UDP);
+  tx_socket_handle = wifi_socket_create(WIFI_SOCKET_TYPE_UDP);
+  wifi_socket_bind(rx_local_port, rx_socket_handle);
+  wifi_socket_bind(tx_local_port, tx_socket_handle);
 #endif
 }
 

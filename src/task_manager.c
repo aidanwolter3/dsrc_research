@@ -15,6 +15,7 @@ volatile static uint8_t task_events = 0;
 //indicates which event to set on a timer interrupt
 TASK_EVENT timer_events[TIMER_CNT] = {TASK_EVENT_END};
 
+//timer 0
 void timer0_handler() {
 	ROM_TimerIntClear(TIMER0_BASE, TIMER_A);
 	task_set_event(timer_events[0]);
@@ -29,6 +30,23 @@ void task_start_timer0(TASK_EVENT e, uint32_t us) {
 	ROM_TimerEnable(TIMER0_BASE, TIMER_A);
 
 	timer_events[0] = TASK_EVENT_TIMER0;
+}
+
+//timer 1
+void timer1_handler() {
+	ROM_TimerIntClear(TIMER1_BASE, TIMER_A);
+	task_set_event(timer_events[1]);
+}
+void task_start_timer1(TASK_EVENT e, uint32_t us) {
+	ROM_SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER1);
+	ROM_TimerConfigure(TIMER1_BASE, TIMER_CFG_PERIODIC);
+	ROM_TimerLoadSet(TIMER1_BASE, TIMER_A, 16*us);
+	TimerIntRegister(TIMER1_BASE, TIMER_A, timer1_handler);
+	ROM_IntEnable(INT_TIMER1A);
+	ROM_TimerIntEnable(TIMER1_BASE, TIMER_TIMA_TIMEOUT);
+	ROM_TimerEnable(TIMER1_BASE, TIMER_A);
+
+	timer_events[1] = TASK_EVENT_TIMER1;
 }
 
 //set an event to be triggered
