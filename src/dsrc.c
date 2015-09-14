@@ -133,20 +133,41 @@ int main(void) {
       #if WIFI_PRESENT
       if(tx_socket_handle != 0xFF) {
         char *str = malloc(256*sizeof(char));
+
+        //send different data depending on the device selected
+        uint16_t len = 0;
+        uint8_t *data;
         if(device_color == GREEN_LED) {
-          uint16_t len = 5;
-          uint8_t data[] = {'g', 'r', 'e', 'e', 'n'};
-          wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
-          sprintf(str, "tx %d:%d:%d:%d : green", remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3]);
+          len = 5;
+          data = malloc(strlen("green"));
+          strcpy((char*)data, "green");
         }
         else {
-          uint16_t len = 4;
-          uint8_t data[] = {'b', 'l', 'u', 'e'};
-          wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
-          sprintf(str, "tx %d:%d:%d:%d : blue", remote_ip[0], remote_ip[1], remote_ip[2], remote_ip[3]);
+          len = 4;
+          data = malloc(strlen("blue"));
+          strcpy((char*)data, "blue");
+        }
+
+        wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
+
+        //print what was transmitted
+        sprintf(str, "tx {%x.%x.%x.%x}: ", remote_ip[0],
+                                           remote_ip[1],
+                                           remote_ip[2],
+                                           remote_ip[3]);
+        int i;
+        for(i = 0; i < len; i++) {
+          sprintf(str+strlen(str), "%x ", data[i]);
+        }
+        sprintf(str+strlen(str), "; ");
+        for(i = 0; i < len; i++) {
+          sprintf(str+strlen(str), "%c", data[i]);
         }
         con_println(str);
+
+        //clean up
         free(str);
+        free(data);
       }
       #endif
 
@@ -210,7 +231,7 @@ void wifi_configure() {
   wifi_set_channel_list(channels, 11);
   wifi_set_cp_security_open(WIFI_CP1);
   wifi_set_cp_ssid(WIFI_CP1, "vanet_server");
-  wifi_set_ip_address(WIFI_IP_CONFIG_STATIC, ip);
+  wifi_set_ip_address(WIFI_IP_CONFIG_DHCP, ip);
   wifi_set_netmask(netmask);
   wifi_set_gateway(gateway);
   wifi_set_mac(mac);

@@ -577,15 +577,24 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
         return PACKET_LENGTH_INVALID;
       }
 
+      //save the data
       memcpy(&wifi_socket_recv_from_response, p->data, 22*sizeof(uint8_t*));
       wifi_socket_recv_from_response.data = malloc(wifi_socket_recv_from_response.size*sizeof(uint8_t));
       memcpy(&(wifi_socket_recv_from_response.data), p->data+22, wifi_socket_recv_from_response.size);
 
+      //print what was received
       char *str = malloc(256*sizeof(char));
-      sprintf(str, "rx: ");
+      sprintf(str, "rx {%x.%x.%x.%x}: ", wifi_socket_recv_from_response.remote_ip[0],
+                                         wifi_socket_recv_from_response.remote_ip[1],
+                                         wifi_socket_recv_from_response.remote_ip[2],
+                                         wifi_socket_recv_from_response.remote_ip[3]);
       int i;
       for(i = 0; i < wifi_socket_recv_from_response.size; i++) {
-        sprintf(str+strlen(str), "0x%x ", p->data[22+i]);
+        sprintf(str+strlen(str), "%x ", p->data[22+i]);
+      }
+      sprintf(str+strlen(str), "; ");
+      for(i = 0; i < wifi_socket_recv_from_response.size; i++) {
+        sprintf(str+strlen(str), "%c ", p->data[22+i]);
       }
       con_println(str);
       free(str);
