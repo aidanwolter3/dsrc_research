@@ -277,6 +277,7 @@ void wifi_socket_send();
 void wifi_socket_recv(uint8_t socket_handle, uint16_t len);
 void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *remote_ip, uint16_t len, uint8_t *data);
 void wifi_socket_recv_from(uint8_t socket_handle, uint16_t len);
+bool wifi_get_recv_from_packet(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from);
 void wifi_socket_allocate();
 
 #endif //WIFI_MCW1001A_MIKRO_H_

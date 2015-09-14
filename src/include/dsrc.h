@@ -6,10 +6,18 @@
 
 typedef struct {
   char     name[16];
-  uint32_t latitude;
-  uint32_t longitude;
+  uint32_t lat;
+  uint32_t lon;
 } DSRC_HEARTBEAT;
 
+typedef struct {
+  uint8_t         ip[4];
+  DSRC_HEARTBEAT *hb;
+  uint8_t         trust;
+  uint8_t         timeout;
+} DSRC_DEVICE;
+
+void print_device_table();
 void send_heartbeat();
 void wifi_configure();
 void wifi_start();

@@ -22,6 +22,14 @@ volatile static uint16_t  buffer_size;
 volatile static uint16_t  buffer_start;
 volatile static uint16_t  buffer_end;
 
+#define           WIFI_RECV_FROM_BUFFER_LENGTH 16
+#define           RECV_FROM_BUFFER_NEXT(c)    (((c+1) > WIFI_RECV_FROM_BUFFER_LENGTH) ? 0 : (c+1))
+WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE**   recv_from_buffer;
+static uint8_t                            recv_from_buffer_size;
+static uint8_t                            recv_from_buffer_start;
+static uint8_t                            recv_from_buffer_end;
+
+//ensure that only one recv_from request is sent at a time until a response is given
 static volatile bool recv_from_clear = true;
 
 //private procedures
@@ -40,18 +48,23 @@ WIFI_PACKET_SOCKET_ACCEPT_RESPONSE        wifi_socket_accept_response;
 WIFI_PACKET_SOCKET_ALLOCATE_RESPONSE      wifi_socket_allocate_response;
 WIFI_PACKET_SOCKET_BIND_RESPONSE          wifi_socket_bind_response;
 WIFI_PACKET_SOCKET_RECV_RESPONSE          wifi_socket_recv_response;
-WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE     wifi_socket_recv_from_response;
 WIFI_PACKET_SOCKET_SEND_TO_RESPONSE       wifi_socket_send_to_response;
 uint8_t                                   wifi_socket_handle;
 uint8_t                                   wifi_socket_connect_result;
 
 void wifi_init() {
 
-  //initialize the buffer
+  //initialize the buffer for UART communications to wifi module
   buffer_size = 0;
   buffer_start = 0;
   buffer_end = 0;
   buffer = malloc(WIFI_BUFFER_LENGTH*sizeof(uint8_t));
+
+  //initialize the buffer for incoming recv_from packets
+  recv_from_buffer_size = 0;
+  recv_from_buffer_start = 0;
+  recv_from_buffer_end = 0;
+  recv_from_buffer = malloc(WIFI_RECV_FROM_BUFFER_LENGTH*sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE*));
 
   //initialize the data
   memset(&wifi_network_status, 0, sizeof(WIFI_PACKET_NETWORK_STATUS));
@@ -231,6 +244,16 @@ void wifi_socket_recv_from(uint8_t socket_handle, uint16_t len) {
   }
 }
 
+bool wifi_get_recv_from_packet(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from) {
+  if(recv_from_buffer_size > 0) {
+    memcpy(recv_from, recv_from_buffer[recv_from_buffer_start], sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
+    recv_from_buffer_size--;
+    recv_from_buffer_start = RECV_FROM_BUFFER_NEXT(recv_from_buffer_start);
+    return true;
+  }
+  return false;
+}
+
 void wifi_socket_recv(uint8_t socket_handle, uint16_t len) {
   uint8_t *data = malloc(4*sizeof(uint8_t));
   data[0] = socket_handle;
@@ -359,10 +382,10 @@ bool wifi_wait_for_event_response(uint16_t event_type) {
 
 void wifi_put_packet(WIFI_PACKET *p) {
 
-#if SHOW_WIFI_PACKETS
+  #if SHOW_WIFI_PACKETS
   con_printf("-> ");
   wifi_print_packet(p);
-#endif
+  #endif
 
   uint8_t *data = malloc((7+(p->len))*sizeof(char));
   data[0] = 0x55; //header
@@ -494,10 +517,10 @@ void wifi_print_packet(WIFI_PACKET *p) {
 //3. parse the data and save
 PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
 
-#if SHOW_WIFI_PACKETS
+  #if SHOW_WIFI_PACKETS
   con_printf("<- ");
   wifi_print_packet(p);
-#endif
+  #endif
 
   switch(p->type & ~WIFI_PACKET_TYPE_PIGGYBACKBIT) {
     case WIFI_PACKET_TYPE_ACK: {
@@ -607,30 +630,53 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       }
 
       //save the data
-      memcpy(&wifi_socket_recv_from_response, p->data, 22*sizeof(uint8_t*));
-      wifi_socket_recv_from_response.data = malloc(wifi_socket_recv_from_response.size*sizeof(uint8_t));
-      memcpy(&(wifi_socket_recv_from_response.data), p->data+22, wifi_socket_recv_from_response.size);
+      WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *wifi_packet_socket_recv_from_response = malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
+      memcpy(wifi_packet_socket_recv_from_response, p->data, 22*sizeof(uint8_t));
+      wifi_packet_socket_recv_from_response->data = malloc(wifi_packet_socket_recv_from_response->size*sizeof(uint8_t));
+      memcpy(wifi_packet_socket_recv_from_response->data, p->data+22, wifi_packet_socket_recv_from_response->size);
+
+      //add the received packet to the recv_from_buffer
+      //recv_from buffer is empty so place the character in the first space
+      if(recv_from_buffer_size == 0) {
+        recv_from_buffer[recv_from_buffer_start] = wifi_packet_socket_recv_from_response;
+        recv_from_buffer_size++;
+      }
+
+      //recv_from buffer is not empty, so ensure that we do not overflow
+      else {
+
+        //calculate the new buffer end location
+        uint16_t proposed_buffer_end = RECV_FROM_BUFFER_NEXT(recv_from_buffer_end);
+
+        //ensure that we do not overflow the buffer
+        if(proposed_buffer_end != recv_from_buffer_start) {
+          recv_from_buffer_end = proposed_buffer_end;
+          recv_from_buffer[recv_from_buffer_end] = wifi_packet_socket_recv_from_response;
+          recv_from_buffer_size++;
+        }
+      }
 
       //print what was received
       #if SHOW_WIFI_RX
       char *str = malloc(256*sizeof(char));
-      sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", wifi_socket_recv_from_response.remote_ip[0],
-                                             wifi_socket_recv_from_response.remote_ip[1],
-                                             wifi_socket_recv_from_response.remote_ip[2],
-                                             wifi_socket_recv_from_response.remote_ip[3]);
+      sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", wifi_packet_socket_recv_from_response->remote_ip[0],
+                                                 wifi_packet_socket_recv_from_response->remote_ip[1],
+                                                 wifi_packet_socket_recv_from_response->remote_ip[2],
+                                                 wifi_packet_socket_recv_from_response->remote_ip[3]);
       int i;
-      for(i = 0; i < wifi_socket_recv_from_response.size; i++) {
-        sprintf(str+strlen(str), "%x ", p->data[22+i]);
+      for(i = 0; i < wifi_packet_socket_recv_from_response->size; i++) {
+        sprintf(str+strlen(str), "%x ", wifi_packet_socket_recv_from_response->data[i]);
       }
       sprintf(str+strlen(str), "; ");
-      for(i = 0; i < wifi_socket_recv_from_response.size; i++) {
-        sprintf(str+strlen(str), "%c", p->data[22+i]);
+      for(i = 0; i < wifi_packet_socket_recv_from_response->size; i++) {
+        sprintf(str+strlen(str), "%c", wifi_packet_socket_recv_from_response->data[i]);
       }
       con_println(str);
       free(str);
       #endif
 
       recv_from_clear = true;
+      task_set_event(TASK_EVENT_WIFI_RECV_FROM);
       break;
     }
     case WIFI_PACKET_TYPE_SOCKET_ALLOCATE_RESPONSE_MSG: {

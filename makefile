@@ -96,9 +96,15 @@ DRIVER_LIB	= $(TIVAWARE)/driverlib/gcc/libdriver.a
 LIBS        = '$(LIBM)' '$(LIBC)' '$(LIBGCC)' '$(DRIVER_LIB)'
 
 
-# Command Definitions, Leave it alone unless you hate yourself.
+# Command Definitions
 ###############################################################################
-all: dirs bin/$(TARGET).bin size
+
+#default to green device, because blue is better
+all: clean
+all: CFLAGS += -DSELECT_GREEN_DEVICE
+all: build
+
+build: dirs bin/$(TARGET).bin size
 
 blue: clean
 blue: CFLAGS += -DSELECT_BLUE_DEVICE
@@ -185,7 +191,7 @@ clean:
 	-$(RM) bin/*
 
 # Flash The Board
-flash: all
+flash: build
 	@if [ 'x${VERBOSE}' = x ];                                                \
 	 then                                                                     \
 	     echo "  FLASH    bin/$(TARGET).bin";                                 \

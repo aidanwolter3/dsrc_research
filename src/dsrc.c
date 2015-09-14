@@ -34,6 +34,10 @@ uint16_t tx_remote_port   = 10002;
 uint8_t  rx_socket_handle = 0xFF;
 uint8_t  tx_socket_handle = 0xFF;
 
+//table to keep track of every device and their location
+DSRC_DEVICE device_table[16];
+uint8_t device_table_size = 0;
+
 //interrupt handler for switches
 void port_f_handler() {
   uint32_t sw1_status = GPIOPinRead(GPIO_PORTF_BASE, GPIO_PIN_4);
@@ -120,6 +124,40 @@ int main(void) {
       task_clear_event(TASK_EVENT_WIFI);
     }
 
+    //parse the incoming RECV_FROM packets
+    if(isbitset(events, TASK_EVENT_WIFI_RECV_FROM) == true) {
+
+      //iterate over every packet
+      WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from = malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
+      while(wifi_get_recv_from_packet(recv_from) == true) {
+        
+        //check if ip already exists in device table
+        bool found = false;
+        for(int i = 0; i < device_table_size; i++) {
+          if(memcmp(recv_from->remote_ip, device_table[i].ip, 4*sizeof(uint8_t)) == 0) {
+            memcpy(device_table[i].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
+            device_table[i].timeout = 0;
+            found = true;
+            break;
+          }
+        }
+        
+        //add the device if it doesn't already exist
+        if(found == false) {
+          memcpy(device_table[device_table_size].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
+          device_table[device_table_size].hb = malloc(sizeof(DSRC_HEARTBEAT));
+          memcpy(device_table[device_table_size].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
+          device_table[device_table_size].trust = 1;
+          device_table[device_table_size].timeout = 0;
+          device_table_size++;
+        }
+
+        print_device_table();
+      }
+
+      task_clear_event(TASK_EVENT_WIFI_RECV_FROM);
+    }
+
     //1Hz timer
     if(isbitset(events, TASK_EVENT_TIMER0) == true) {
 
@@ -176,13 +214,25 @@ int main(void) {
   }
 }
 
+void print_device_table() {
+  con_println("DEVICE TABLE:");
+  char *str = malloc(256*sizeof(char));
+  for(int i = 0; i < device_table_size; i++) {
+    sprintf(str, "%s: %lu, %lu", device_table[i].hb->name,
+        device_table[i].hb->lat,
+        device_table[i].hb->lon);
+    con_println(str);
+  }
+  con_println("");
+}
+
 void send_heartbeat() {
 
   //send different data depending on the device selected
   DSRC_HEARTBEAT *hb = malloc(sizeof(DSRC_HEARTBEAT));
   memset(hb, 0, sizeof(DSRC_HEARTBEAT));
-  hb->latitude = 32;
-  hb->longitude = 94;
+  hb->lat = 32;
+  hb->lon = 94;
   if(DEVICE == GREEN_DEVICE) {
     strcpy(hb->name, "green");
   }
