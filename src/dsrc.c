@@ -5,11 +5,7 @@
  *      Author: Aidan
  */
 
-#include "common.h"
-#include "console.h"
-#include "gps_l80_mikro.h"
-#include "wifi_mcw1001a_mikro.h"
-#include "task_manager.h"
+#include "dsrc.h"
 
 //*****************************************************************************
 //
@@ -20,14 +16,6 @@
 void __error__(char *pcFilename, uint32_t ui32Line) {
 }
 #endif
-
-void send_heartbeat();
-void wifi_configure();
-void wifi_start();
-void switch_configure();
-
-//determines what device it is
-uint32_t device_color = RED_LED;
 
 //wifi configurations
 WIFI_NETWORK_MODE network_mode = WIFI_NETWORK_MODE_ADHOC;
@@ -191,23 +179,21 @@ int main(void) {
 void send_heartbeat() {
 
   //send different data depending on the device selected
-  uint16_t len = 0;
-  uint8_t *data;
-  if(device_color == GREEN_LED) {
-    len = 5;
-    data = malloc(strlen("green"));
-    strcpy((char*)data, "green");
+  DSRC_HEARTBEAT *hb = malloc(sizeof(DSRC_HEARTBEAT));
+  memset(hb, 0, sizeof(DSRC_HEARTBEAT));
+  hb->latitude = 32;
+  hb->longitude = 94;
+  if(DEVICE == GREEN_DEVICE) {
+    strcpy(hb->name, "green");
   }
   else {
-    len = 4;
-    data = malloc(strlen("blue"));
-    strcpy((char*)data, "blue");
+    strcpy(hb->name, "blue");
   }
 
-  wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
+  wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_HEARTBEAT), (uint8_t*)hb);
 
   //clean up
-  free(data);
+  free(hb);
 }
 
 //configure adhoc, channels, security, ssid, ip, netmask, gateway, mac, arp, and retries
