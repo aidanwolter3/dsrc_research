@@ -21,6 +21,7 @@ void __error__(char *pcFilename, uint32_t ui32Line) {
 }
 #endif
 
+void send_heartbeat();
 void wifi_configure();
 void wifi_start();
 void switch_configure();
@@ -138,42 +139,7 @@ int main(void) {
 
       //transmit socket is ready
       if(tx_socket_handle != 0xFF) {
-        char *str = malloc(256*sizeof(char));
-
-        //send different data depending on the device selected
-        uint16_t len = 0;
-        uint8_t *data;
-        if(device_color == GREEN_LED) {
-          len = 5;
-          data = malloc(strlen("green"));
-          strcpy((char*)data, "green");
-        }
-        else {
-          len = 4;
-          data = malloc(strlen("blue"));
-          strcpy((char*)data, "blue");
-        }
-
-        wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
-
-        //print what was transmitted
-        sprintf(str, "tx {%02x.%02x.%02x.%02x}: ", remote_ip[0],
-                                               remote_ip[1],
-                                               remote_ip[2],
-                                               remote_ip[3]);
-        int i;
-        for(i = 0; i < len; i++) {
-          sprintf(str+strlen(str), "%x ", data[i]);
-        }
-        sprintf(str+strlen(str), "; ");
-        for(i = 0; i < len; i++) {
-          sprintf(str+strlen(str), "%c", data[i]);
-        }
-        con_println(str);
-
-        //clean up
-        free(str);
-        free(data);
+        send_heartbeat();
       }
       #endif
 
@@ -220,6 +186,28 @@ int main(void) {
       task_clear_event(TASK_EVENT_TIMER1);
     }
   }
+}
+
+void send_heartbeat() {
+
+  //send different data depending on the device selected
+  uint16_t len = 0;
+  uint8_t *data;
+  if(device_color == GREEN_LED) {
+    len = 5;
+    data = malloc(strlen("green"));
+    strcpy((char*)data, "green");
+  }
+  else {
+    len = 4;
+    data = malloc(strlen("blue"));
+    strcpy((char*)data, "blue");
+  }
+
+  wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, len, data);
+
+  //clean up
+  free(data);
 }
 
 //configure adhoc, channels, security, ssid, ip, netmask, gateway, mac, arp, and retries

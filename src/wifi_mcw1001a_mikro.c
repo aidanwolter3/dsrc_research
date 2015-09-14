@@ -251,6 +251,26 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
   packet_data[21] = (len >> 8) & 0xFF;
   memcpy(packet_data+22, data, len*sizeof(uint8_t));
   wifi_send_basic_packet(WIFI_PACKET_TYPE_SOCKET_SEND_TO_MSG, WIFI_PACKET_TYPE_NONE, 22+len, packet_data);
+
+  //print what was transmitted
+  #if SHOW_WIFI_TRANSFERS
+  char *str = malloc(256*sizeof(char));
+  sprintf(str, "tx {%02x.%02x.%02x.%02x}: ", remote_ip[0],
+                                             remote_ip[1],
+                                             remote_ip[2],
+                                             remote_ip[3]);
+  int i;
+  for(i = 0; i < len; i++) {
+    sprintf(str+strlen(str), "%x ", packet_data[22+i]);
+  }
+  sprintf(str+strlen(str), "; ");
+  for(i = 0; i < len; i++) {
+    sprintf(str+strlen(str), "%c", packet_data[22+i]);
+  }
+  con_println(str);
+  free(str);
+  #endif
+
   free(packet_data);
 }
 
@@ -592,6 +612,7 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       memcpy(&(wifi_socket_recv_from_response.data), p->data+22, wifi_socket_recv_from_response.size);
 
       //print what was received
+      #if SHOW_WIFI_TRANSFERS
       char *str = malloc(256*sizeof(char));
       sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", wifi_socket_recv_from_response.remote_ip[0],
                                              wifi_socket_recv_from_response.remote_ip[1],
@@ -607,6 +628,7 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       }
       con_println(str);
       free(str);
+      #endif
 
       recv_from_clear = true;
       break;
