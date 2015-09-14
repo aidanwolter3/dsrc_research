@@ -111,11 +111,47 @@ WIFI_PACKET_NETWORK_STATUS wifi_get_network_status() {
   return wifi_network_status;
 }
 
+void wifi_print_network_status() {
+  char *status_str = malloc(256*sizeof(char));
+
+  con_println("\nNetwork status:");
+  sprintf(status_str, "    mac    : %d:%d:%d:%d:%d:%d",
+                              wifi_network_status.mac[0],
+                              wifi_network_status.mac[1],
+                              wifi_network_status.mac[2],
+                              wifi_network_status.mac[3],
+                              wifi_network_status.mac[4],
+                              wifi_network_status.mac[5]);
+  con_println(status_str);
+  sprintf(status_str, "    ip     : %d:%d:%d:%d",
+                            wifi_network_status.ip[0],
+                            wifi_network_status.ip[1],
+                            wifi_network_status.ip[2],
+                            wifi_network_status.ip[3]);
+  con_println(status_str);
+  sprintf(status_str, "    netmask: %d:%d:%d:%d",
+                            wifi_network_status.netmask[0],
+                            wifi_network_status.netmask[1],
+                            wifi_network_status.netmask[2],
+                            wifi_network_status.netmask[3]);
+  con_println(status_str);
+  sprintf(status_str, "    gateway: %d:%d:%d:%d",
+                            wifi_network_status.gateway[0],
+                            wifi_network_status.gateway[1],
+                            wifi_network_status.gateway[2],
+                            wifi_network_status.gateway[3]);
+  con_println(status_str);
+  sprintf(status_str, "    status : %d\n", wifi_network_status.status);
+  con_println(status_str);
+
+  free(status_str);
+}
+
 void wifi_set_cp_ssid(WIFI_CP cp, char *ssid) {
-  uint8_t *data = malloc((2+strlen(ssid))*sizeof(uint8_t));
-  data[0] = cp;
-  data[1] = strlen(ssid);
-  memcpy(&data[2], ssid, strlen(ssid));
+uint8_t *data = malloc((2+strlen(ssid))*sizeof(uint8_t));
+data[0] = cp;
+data[1] = strlen(ssid);
+memcpy(&data[2], ssid, strlen(ssid));
   wifi_send_basic_packet(WIFI_PACKET_TYPE_SET_CP_SSID_MSG, WIFI_PACKET_TYPE_ACK, (strlen(ssid)+2), data);
   free(data);
 }
@@ -462,33 +498,6 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       }
       memcpy(&wifi_network_status, p->data, sizeof(WIFI_PACKET_NETWORK_STATUS));
 
-      //print the status
-      char status_str[256];
-      con_println("\nNetwork status:");
-      sprintf(status_str, "    mac    : %d:%d:%d:%d:%d:%d", wifi_network_status.mac[0],
-                                  wifi_network_status.mac[1],
-                                  wifi_network_status.mac[2],
-                                  wifi_network_status.mac[3],
-                                  wifi_network_status.mac[4],
-                                  wifi_network_status.mac[5]);
-      con_println(status_str);
-      sprintf(status_str, "    ip     : %d:%d:%d:%d", wifi_network_status.ip[0],
-                                wifi_network_status.ip[1],
-                                wifi_network_status.ip[2],
-                                wifi_network_status.ip[3]);
-      con_println(status_str);
-      sprintf(status_str, "    netmask: %d:%d:%d:%d", wifi_network_status.netmask[0],
-                                wifi_network_status.netmask[1],
-                                wifi_network_status.netmask[2],
-                                wifi_network_status.netmask[3]);
-      con_println(status_str);
-      sprintf(status_str, "    gateway: %d:%d:%d:%d", wifi_network_status.gateway[0],
-                                wifi_network_status.gateway[1],
-                                wifi_network_status.gateway[2],
-                                wifi_network_status.gateway[3]);
-      con_println(status_str);
-      sprintf(status_str, "    status : %d\n", wifi_network_status.status);
-      con_println(status_str);
 
       break;
     }
@@ -584,17 +593,17 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
 
       //print what was received
       char *str = malloc(256*sizeof(char));
-      sprintf(str, "rx {%x.%x.%x.%x}: ", wifi_socket_recv_from_response.remote_ip[0],
-                                         wifi_socket_recv_from_response.remote_ip[1],
-                                         wifi_socket_recv_from_response.remote_ip[2],
-                                         wifi_socket_recv_from_response.remote_ip[3]);
+      sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", wifi_socket_recv_from_response.remote_ip[0],
+                                             wifi_socket_recv_from_response.remote_ip[1],
+                                             wifi_socket_recv_from_response.remote_ip[2],
+                                             wifi_socket_recv_from_response.remote_ip[3]);
       int i;
       for(i = 0; i < wifi_socket_recv_from_response.size; i++) {
         sprintf(str+strlen(str), "%x ", p->data[22+i]);
       }
       sprintf(str+strlen(str), "; ");
       for(i = 0; i < wifi_socket_recv_from_response.size; i++) {
-        sprintf(str+strlen(str), "%c ", p->data[22+i]);
+        sprintf(str+strlen(str), "%c", p->data[22+i]);
       }
       con_println(str);
       free(str);

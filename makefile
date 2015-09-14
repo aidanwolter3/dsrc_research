@@ -100,6 +100,14 @@ LIBS        = '$(LIBM)' '$(LIBC)' '$(LIBGCC)' '$(DRIVER_LIB)'
 ###############################################################################
 all: dirs bin/$(TARGET).bin size
 
+blue: clean
+blue: CFLAGS += -DSELECT_BLUE_DEVICE
+blue: flash
+
+green: clean
+green: CFLAGS += -DSELECT_GREEN_DEVICE
+green: flash
+
 screen: flash
 	screen /dev/tty.usbmodem0E20F341 115200
 

@@ -29,9 +29,19 @@
 #define GPS_PRESENT		false
 #define SHOW_WIFI_PACKETS false
 
+#define GREEN_DEVICE 0x1
+#define BLUE_DEVICE 0x2
+#ifdef SELECT_GREEN_DEVICE
+  #define DEVICE GREEN_DEVICE
+#endif
+#ifdef SELECT_BLUE_DEVICE
+  #define DEVICE BLUE_DEVICE
+#endif
+
 #define RED_LED   GPIO_PIN_1
 #define BLUE_LED  GPIO_PIN_2
 #define GREEN_LED GPIO_PIN_3
+
 
 //macros
 #define bitset(b) (1 << (b))

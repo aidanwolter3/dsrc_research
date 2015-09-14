@@ -236,6 +236,7 @@ void wifi_set_gateway(uint8_t *gateway);
 void wifi_set_mac(uint8_t *mac);
 void wifi_set_arp_time(uint16_t arp_time);
 WIFI_PACKET_NETWORK_STATUS wifi_get_network_status();
+void wifi_print_network_status();
 
 //general configuration
 void wifi_set_cp_network_mode(WIFI_CP cp, WIFI_NETWORK_MODE network_mode);
