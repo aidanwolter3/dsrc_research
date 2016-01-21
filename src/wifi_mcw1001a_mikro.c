@@ -9,25 +9,19 @@
 #include "wifi_mcw1001a_mikro.h"
 #include "mikro.h"
 #include "task_manager.h"
+#include "queue.h"
 
 //buffer that holds all received characters until 0x45
 //should be private
-
+#define           BUFFER_SIZE  10
+#define           BUFFER_MAX_PACKET_SIZE  80
+static char*    buffer;
+volatile static uint8_t  buffer_index;
+volatile static uint8_t  buffer_packet_index;
 extern uint8_t socket_handle;
 
-#define           WIFI_BUFFER_LENGTH  1024
-#define           BUFFER_NEXT(c)    (((c+1) > WIFI_BUFFER_LENGTH) ? 0 : (c+1))
-volatile static char*     buffer;
-volatile static uint16_t  buffer_size;
-volatile static uint16_t  buffer_start;
-volatile static uint16_t  buffer_end;
-
-#define           WIFI_RECV_FROM_BUFFER_LENGTH 16
-#define           RECV_FROM_BUFFER_NEXT(c)    (((c+1) > WIFI_RECV_FROM_BUFFER_LENGTH) ? 0 : (c+1))
-WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE**   recv_from_buffer;
-static uint8_t                            recv_from_buffer_size;
-static uint8_t                            recv_from_buffer_start;
-static uint8_t                            recv_from_buffer_end;
+//use a queue to store the incoming recv_from packets
+queue recv_from_buffer;
 
 //ensure that only one recv_from request is sent at a time until a response is given
 static volatile bool recv_from_clear = true;
@@ -52,19 +46,17 @@ WIFI_PACKET_SOCKET_SEND_TO_RESPONSE       wifi_socket_send_to_response;
 uint8_t                                   wifi_socket_handle;
 uint8_t                                   wifi_socket_connect_result;
 
+
 void wifi_init() {
 
   //initialize the buffer for UART communications to wifi module
-  buffer_size = 0;
-  buffer_start = 0;
-  buffer_end = 0;
-  buffer = malloc(WIFI_BUFFER_LENGTH*sizeof(uint8_t));
+  buffer_index = 0;
+  buffer_packet_index = 0;
+  buffer = malloc(BUFFER_SIZE*BUFFER_MAX_PACKET_SIZE*sizeof(char));
+  memset(buffer, 0, BUFFER_SIZE*BUFFER_MAX_PACKET_SIZE);
 
-  //initialize the buffer for incoming recv_from packets
-  recv_from_buffer_size = 0;
-  recv_from_buffer_start = 0;
-  recv_from_buffer_end = 0;
-  recv_from_buffer = malloc(WIFI_RECV_FROM_BUFFER_LENGTH*sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE*));
+  //initialize the recv_from_buffer
+  queue_alloc(&recv_from_buffer, 10);
 
   //initialize the data
   memset(&wifi_network_status, 0, sizeof(WIFI_PACKET_NETWORK_STATUS));
@@ -245,13 +237,13 @@ void wifi_socket_recv_from(uint8_t socket_handle, uint16_t len) {
 }
 
 bool wifi_get_recv_from_packet(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from) {
-  if(recv_from_buffer_size > 0) {
-    memcpy(recv_from, recv_from_buffer[recv_from_buffer_start], sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
-    recv_from_buffer_size--;
-    recv_from_buffer_start = RECV_FROM_BUFFER_NEXT(recv_from_buffer_start);
-    return true;
+  WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *packet = queue_pop(&recv_from_buffer);
+  if(packet == NULL) {
+    return false;
   }
-  return false;
+  memcpy(recv_from, packet, sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
+  free(packet);
+  return true;
 }
 
 void wifi_socket_recv(uint8_t socket_handle, uint16_t len) {
@@ -277,7 +269,7 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
 
   //print what was transmitted
   #if SHOW_WIFI_TX
-  char *str = malloc(256*sizeof(char));
+  char str[256];
   sprintf(str, "tx {%02x.%02x.%02x.%02x}: ", remote_ip[0],
                                              remote_ip[1],
                                              remote_ip[2],
@@ -291,7 +283,6 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
     sprintf(str+strlen(str), "%c", packet_data[22+i]);
   }
   con_println(str);
-  free(str);
   #endif
 
   free(packet_data);
@@ -366,9 +357,11 @@ bool wifi_wait_for_event_response(uint16_t event_type) {
         correct_response_found = true;
       }
       wifi_process_packet(p);
+      con_println("after");
       free(p->data);
       free(p);
       p = wifi_get_packet();
+      con_println("after2");
     }
     task_clear_event(TASK_EVENT_WIFI);
 
@@ -406,102 +399,60 @@ void wifi_put_packet(WIFI_PACKET *p) {
 }
 
 WIFI_PACKET* wifi_get_packet() {
-  WIFI_PACKET *p = malloc(sizeof(WIFI_PACKET));
-  memset(p, 0, sizeof(WIFI_PACKET));
+  
+  //get the next packet in the buffer
+  uint8_t index = buffer_index;
+  while(true) {
+    index = (index+1) % BUFFER_SIZE;
 
-  //check that we have at least 7 bytes before the end of the buffer
-  uint16_t distance = buffer_end + 1 + WIFI_BUFFER_LENGTH - buffer_start;
-  if(distance >= WIFI_BUFFER_LENGTH) {
-    distance -= WIFI_BUFFER_LENGTH;
-  }
-  if(distance < 7) {
-    free(p);
-    buffer_start = buffer_end;
-    buffer_size  = 0;
-    return NULL;
-  }
-
-  //get the `next` byte of the header to compare
-  uint16_t next = BUFFER_NEXT(buffer_start);
-
-  //look for header 0x55AA
-  while(buffer[buffer_start] != 0x55 || buffer[next] != 0xAA) {
-    distance--;
-    if(distance < 7) {
-      free(p);
-      buffer_start = buffer_end;
-      buffer_size  = 0;
+    //no packets available
+    if(index == buffer_index) {
       return NULL;
     }
 
-    //move forward and keep looking
-    buffer_start = next;
-    next = BUFFER_NEXT(buffer_start);
+    //ensure the header is good
+    char *packet = buffer + index*BUFFER_MAX_PACKET_SIZE;
+    if(packet[0] != 0x55 || packet[1] != 0xAA) {
+      continue;
+    }
+
+    uint16_t type = packet[2] | (packet[3] << 8);
+    uint16_t len = packet[4] | (packet[5] << 8);
+
+    //ensure the end is correct
+    if(packet[6+len] != 0x45) {
+      continue;
+    }
+
+    WIFI_PACKET *p = malloc(sizeof(WIFI_PACKET));
+    memset(p, 0, sizeof(WIFI_PACKET));
+    p->type = type;
+    p->len = len;
+
+    //grab the data
+    p->data = malloc(len * sizeof(uint8_t));
+    int i;
+    for(i = 0; i < len; i++) {
+      p->data[i] = packet[i+6];
+    }
+
+    //clear the packet
+    packet[0] = 0;
+
+    return p;
   }
-
-  //get the packet type
-  uint16_t type;
-  next = BUFFER_NEXT(next);
-  type = buffer[next];
-  next = BUFFER_NEXT(next);
-  type |= (buffer[next] << 8);
-  p->type = type;
-  distance -= 2;
-
-  //get the packet data length
-  uint16_t len;
-  next = BUFFER_NEXT(next);
-  len = buffer[next];
-  next = BUFFER_NEXT(next);
-  len |= (buffer[next] << 8);
-  p->len = len;
-  distance -= 2;
-
-  //check that we have enough distance for the entire packet
-  if(distance < (1+len)) {
-    free(p);
-    buffer_start = buffer_end;
-    buffer_size  = 0;
-    return NULL;
-  }
-
-  //get the data
-  p->data = malloc(len * sizeof(uint8_t));
-  int i;
-  for(i = 0; i < len; i++) {
-    next = BUFFER_NEXT(next);
-    p->data[i] = buffer[next];
-  }
-
-  //verify that the end of the packet has 0x45
-  next = BUFFER_NEXT(next);
-  if(buffer[next] != 0x45) {
-    free(p->data);
-    free(p);
-    buffer_start = buffer_end;
-    buffer_size  = 0;
-    return NULL;
-  }
-
-  //update the buffer and return the packet
-  if(next == buffer_end) {
-    buffer_end = BUFFER_NEXT(next);
-  }
-  buffer_start = BUFFER_NEXT(next);
-  buffer_size -= (7 + len);
-  return p;
 }
 
 void wifi_print_packet(WIFI_PACKET *p) {
   if(p != NULL) {
-    char *str = malloc(256*sizeof(char));
+    char *str = malloc(512*sizeof(char));
     sprintf(str, "packet: {type: %d, len: %d, data: ",
         p->type,
         p->len);
     
     int i;
     for(i = 0; i < p->len; i++) {
-      sprintf(str+strlen(str), "0x%x ", p->data[i]);
+      sprintf(str+strlen(str), "0x%x ", p->data[i]); // crashing here
     }
 
     sprintf(str+strlen(str), "}");
@@ -540,8 +491,6 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
         return PACKET_LENGTH_INVALID;
       }
       memcpy(&wifi_network_status, p->data, sizeof(WIFI_PACKET_NETWORK_STATUS));
-
-
       break;
     }
     case WIFI_PACKET_TYPE_WPAKEY_RESPONSE_MSG: {
@@ -629,54 +578,35 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
         return PACKET_LENGTH_INVALID;
       }
 
-      //save the data
-      WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *wifi_packet_socket_recv_from_response = malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
-      memcpy(wifi_packet_socket_recv_from_response, p->data, 22*sizeof(uint8_t));
-      wifi_packet_socket_recv_from_response->data = malloc(wifi_packet_socket_recv_from_response->size*sizeof(uint8_t));
-      memcpy(wifi_packet_socket_recv_from_response->data, p->data+22, wifi_packet_socket_recv_from_response->size);
-
-      //add the received packet to the recv_from_buffer
-      //recv_from buffer is empty so place the character in the first space
-      if(recv_from_buffer_size == 0) {
-        recv_from_buffer[recv_from_buffer_start] = wifi_packet_socket_recv_from_response;
-        recv_from_buffer_size++;
-      }
-
-      //recv_from buffer is not empty, so ensure that we do not overflow
-      else {
-
-        //calculate the new buffer end location
-        uint16_t proposed_buffer_end = RECV_FROM_BUFFER_NEXT(recv_from_buffer_end);
-
-        //ensure that we do not overflow the buffer
-        if(proposed_buffer_end != recv_from_buffer_start) {
-          recv_from_buffer_end = proposed_buffer_end;
-          recv_from_buffer[recv_from_buffer_end] = wifi_packet_socket_recv_from_response;
-          recv_from_buffer_size++;
-        }
+      WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *packet = (WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE*)malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
+      memcpy(packet, p->data, 22*sizeof(uint8_t));
+      packet->data = (uint8_t*)malloc(packet->size*sizeof(uint8_t));
+      memcpy(packet->data, p->data+22, packet->size);
+      if(!queue_full(&recv_from_buffer)) {
+        queue_push(&recv_from_buffer, packet);
       }
 
       //print what was received
       #if SHOW_WIFI_RX
       char *str = malloc(256*sizeof(char));
-      sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", wifi_packet_socket_recv_from_response->remote_ip[0],
-                                                 wifi_packet_socket_recv_from_response->remote_ip[1],
-                                                 wifi_packet_socket_recv_from_response->remote_ip[2],
-                                                 wifi_packet_socket_recv_from_response->remote_ip[3]);
+      sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", packet->remote_ip[0],
+                                                 packet->remote_ip[1],
+                                                 packet->remote_ip[2],
+                                                 packet->remote_ip[3]);
       int i;
-      for(i = 0; i < wifi_packet_socket_recv_from_response->size; i++) {
-        sprintf(str+strlen(str), "%x ", wifi_packet_socket_recv_from_response->data[i]);
+      for(i = 0; i < packet->size; i++) {
+        sprintf(str+strlen(str), "%x ", packet->data[i]);
       }
       sprintf(str+strlen(str), "; ");
-      for(i = 0; i < wifi_packet_socket_recv_from_response->size; i++) {
-        sprintf(str+strlen(str), "%c", wifi_packet_socket_recv_from_response->data[i]);
+      for(i = 0; i < packet->size; i++) {
+        sprintf(str+strlen(str), "%c", packet->data[i]);
       }
       con_println(str);
       free(str);
       #endif
 
-      recv_from_clear = true;
       task_set_event(TASK_EVENT_WIFI_RECV_FROM);
+      recv_from_clear = true;
       break;
     }
     case WIFI_PACKET_TYPE_SOCKET_ALLOCATE_RESPONSE_MSG: {
@@ -749,28 +679,18 @@ void wifi_mcw1001a_mikro_interrupt_handler() {
   //retrieve character
   int32_t c = UARTCharGetNonBlocking(UART1_BASE);
 
-  //buffer is empty so place the character in the first space
-  if(buffer_size == 0) {
-    buffer[buffer_start] = c;
-    buffer_size++;
+  //ensure that the location is not being used (do not overwrite)
+  if(buffer_packet_index == 0 && buffer[buffer_index*BUFFER_MAX_PACKET_SIZE] != 0) {
+    return;
   }
 
-  //buffer is not empty, so ensure that we do not overflow
-  else {
-
-    //calculate the new buffer end location
-    uint16_t proposed_buffer_end = BUFFER_NEXT(buffer_end);
-
-    //ensure that we do not overflow the buffer
-    if(proposed_buffer_end != buffer_start) {
-      buffer_end = proposed_buffer_end;
-      buffer[buffer_end] = c;
-      buffer_size++;
-    }
-  }
+  buffer[buffer_index*BUFFER_MAX_PACKET_SIZE + buffer_packet_index] = c;
+  buffer_packet_index++;
 
   //if an end of packet was found, set the event to be triggered
   if(c == 0x45) {
     task_set_event(TASK_EVENT_WIFI);
+    buffer_index = (buffer_index+1) % BUFFER_SIZE;
+    buffer_packet_index = 0;
   }
 }

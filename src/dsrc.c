@@ -153,7 +153,11 @@ int main(void) {
         }
 
         print_device_table();
+
+        //free the packet
+        free(recv_from->data);
       }
+      free(recv_from);
 
       task_clear_event(TASK_EVENT_WIFI_RECV_FROM);
     }
@@ -216,7 +220,7 @@ int main(void) {
 
 void print_device_table() {
   con_println("DEVICE TABLE:");
-  char *str = malloc(256*sizeof(char));
+  char str[256];
   for(int i = 0; i < device_table_size; i++) {
     sprintf(str, "%s: %lu, %lu", device_table[i].hb->name,
         device_table[i].hb->lat,
