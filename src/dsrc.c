@@ -130,29 +130,29 @@ int main(void) {
       //iterate over every packet
       WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from = malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
       while(wifi_get_recv_from_packet(recv_from) == true) {
-        
-        //check if ip already exists in device table
-        bool found = false;
-        for(int i = 0; i < device_table_size; i++) {
-          if(memcmp(recv_from->remote_ip, device_table[i].ip, 4*sizeof(uint8_t)) == 0) {
-            memcpy(device_table[i].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
-            device_table[i].timeout = 0;
-            found = true;
-            break;
-          }
-        }
-        
-        //add the device if it doesn't already exist
-        if(found == false) {
-          memcpy(device_table[device_table_size].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
-          device_table[device_table_size].hb = malloc(sizeof(DSRC_HEARTBEAT));
-          memcpy(device_table[device_table_size].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
-          device_table[device_table_size].trust = 1;
-          device_table[device_table_size].timeout = 0;
-          device_table_size++;
-        }
 
-        print_device_table();
+        //check if ip already exists in device table
+        //bool found = false;
+        //for(int i = 0; i < device_table_size; i++) {
+        //  if(memcmp(recv_from->remote_ip, device_table[i].ip, 4*sizeof(uint8_t)) == 0) {
+        //    memcpy(device_table[i].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
+        //    device_table[i].timeout = 0;
+        //    found = true;
+        //    break;
+        //  }
+        //}
+        //
+        ////add the device if it doesn't already exist
+        //if(found == false) {
+        //  memcpy(device_table[device_table_size].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
+        //  device_table[device_table_size].hb = malloc(sizeof(DSRC_HEARTBEAT));
+        //  memcpy(device_table[device_table_size].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
+        //  device_table[device_table_size].trust = 1;
+        //  device_table[device_table_size].timeout = 0;
+        //  device_table_size++;
+        //}
+
+        //print_device_table();
 
         //free the packet
         free(recv_from->data);

@@ -87,6 +87,7 @@ typedef struct {
   uint8_t remote_ip[16];
   uint16_t size;
   uint8_t *data;
+  uint8_t dir;
 } WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE;
 
 //wifi socket send to response packet

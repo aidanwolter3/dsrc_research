@@ -7,6 +7,7 @@
 
 #include "console.h"
 #include "wifi_mcw1001a_mikro.h"
+#include "gps_l80_mikro.h"
 #include "mikro.h"
 #include "task_manager.h"
 #include "queue.h"
@@ -257,6 +258,23 @@ void wifi_socket_recv(uint8_t socket_handle, uint16_t len) {
 }
 
 void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *remote_ip, uint16_t len, uint8_t *data) {
+
+  //PHASED ARRAY SIMULATION
+  //send the current location at the front of the data
+  uint32_t loc[2];
+  loc[0] = 32;
+  loc[1] = 94;
+  //NMEA_STATUS ret = NMEA_VAL_OK;
+  //ret |= gps_l80_get_latitude(&loc[0]);
+  //ret |= gps_l80_get_longitude(&loc[1]);
+  //if(ret == NMEA_VAL_OK) {
+    uint8_t *newdata = malloc(sizeof(loc)+len);
+    memcpy(newdata, loc, sizeof(loc));
+    memcpy(newdata+sizeof(loc), data, len);
+    data = newdata;
+    len = len + sizeof(loc);
+  //}
+
   uint8_t *packet_data = malloc((22+len)*sizeof(uint8_t));
   packet_data[0] = socket_handle;
   packet_data[2] = remote_port & 0xFF;
@@ -357,11 +375,9 @@ bool wifi_wait_for_event_response(uint16_t event_type) {
         correct_response_found = true;
       }
       wifi_process_packet(p);
-      con_println("after");
       free(p->data);
       free(p);
       p = wifi_get_packet();
-      con_println("after2");
     }
     task_clear_event(TASK_EVENT_WIFI);
 
@@ -390,8 +406,7 @@ void wifi_put_packet(WIFI_PACKET *p) {
   memcpy(data+6, p->data, p->len);
   data[6+(p->len)] = 0x45;
 
-  int i;
-  for(i = 0; i < (7+(p->len)); i++) {
+  for(int i = 0; i < (7+(p->len)); i++) {
     UARTCharPut(UART1_BASE, data[i]);
   }
 
@@ -578,10 +593,18 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
         return PACKET_LENGTH_INVALID;
       }
 
+      uint32_t loc[2];
+
       WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *packet = (WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE*)malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
       memcpy(packet, p->data, 22*sizeof(uint8_t));
-      packet->data = (uint8_t*)malloc(packet->size*sizeof(uint8_t));
-      memcpy(packet->data, p->data+22, packet->size);
+      
+      //PHASED ARRAY SIMULATION
+      //copy the simulated phased array data and determine the angle of arrival
+      memcpy(loc, p->data+22, sizeof(loc));
+      packet->dir = 45;
+
+      packet->data = (uint8_t*)malloc(packet->size*sizeof(uint8_t) - sizeof(loc));
+      memcpy(packet->data, p->data+22+sizeof(loc), packet->size);
       if(!queue_full(&recv_from_buffer)) {
         queue_push(&recv_from_buffer, packet);
       }
@@ -589,10 +612,11 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       //print what was received
       #if SHOW_WIFI_RX
       char *str = malloc(256*sizeof(char));
-      sprintf(str, "rx {%02x.%02x.%02x.%02x}: ", packet->remote_ip[0],
-                                                 packet->remote_ip[1],
-                                                 packet->remote_ip[2],
-                                                 packet->remote_ip[3]);
+      sprintf(str, "rx {%02x.%02x.%02x.%02x}, %d°: ", packet->remote_ip[0],
+                                                     packet->remote_ip[1],
+                                                     packet->remote_ip[2],
+                                                     packet->remote_ip[3],
+                                                     packet->dir);
       int i;
       for(i = 0; i < packet->size; i++) {
         sprintf(str+strlen(str), "%x ", packet->data[i]);
