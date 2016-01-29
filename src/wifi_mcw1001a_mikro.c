@@ -67,6 +67,7 @@ void wifi_init() {
   GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_5, GPIO_PIN_5);
   mikro_enable_uart(115200);
   mikro_enable_interrupt(&wifi_mcw1001a_mikro_interrupt_handler);
+
 }
 
 void wifi_parse_buffer() {
@@ -407,7 +408,7 @@ void wifi_put_packet(WIFI_PACKET *p) {
   data[6+(p->len)] = 0x45;
 
   for(int i = 0; i < (7+(p->len)); i++) {
-    UARTCharPut(UART1_BASE, data[i]);
+    UARTCharPut(UART2_BASE, data[i]);
   }
 
   free(data);
@@ -697,11 +698,11 @@ void wifi_mcw1001a_mikro_interrupt_handler() {
 
   //clear interrupt
   uint32_t ui32Status;
-  ui32Status = ROM_UARTIntStatus(UART0_BASE, true);
-  ROM_UARTIntClear(UART1_BASE, ui32Status);
+  ui32Status = ROM_UARTIntStatus(UART2_BASE, true);
+  ROM_UARTIntClear(UART2_BASE, ui32Status);
 
   //retrieve character
-  int32_t c = UARTCharGetNonBlocking(UART1_BASE);
+  int32_t c = UARTCharGetNonBlocking(UART2_BASE);
 
   //ensure that the location is not being used (do not overwrite)
   if(buffer_packet_index == 0 && buffer[buffer_index*BUFFER_MAX_PACKET_SIZE] != 0) {
