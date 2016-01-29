@@ -12,13 +12,13 @@
 
 //bits that indicate what tasks need to be triggered
 typedef enum {
-	TASK_EVENT_ANY = 0,
-	TASK_EVENT_GPS,
-	TASK_EVENT_WIFI,
+  TASK_EVENT_ANY = 0,
+  TASK_EVENT_GPS,
+  TASK_EVENT_WIFI,
   TASK_EVENT_WIFI_RECV_FROM,
-	TASK_EVENT_TIMER0,
-	TASK_EVENT_TIMER1,
-	TASK_EVENT_END
+  TASK_EVENT_TIMER0,
+  TASK_EVENT_TIMER1,
+  TASK_EVENT_END
 } TASK_EVENT;
 
 //set and get whether an event should be run
