@@ -63,10 +63,10 @@ void wifi_init() {
   memset(&wifi_network_status, 0, sizeof(WIFI_PACKET_NETWORK_STATUS));
 
   //initialize the mikro bus
-  mikro_enable_reset();
+  mikro_enable_reset(DEV1);
   GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_5, GPIO_PIN_5);
-  mikro_enable_uart(115200);
-  mikro_enable_interrupt(&wifi_mcw1001a_mikro_interrupt_handler);
+  mikro_enable_uart(DEV1, 115200);
+  mikro_enable_interrupt(DEV1, &wifi_mcw1001a_mikro_interrupt_handler);
 
 }
 

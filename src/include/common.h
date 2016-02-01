@@ -26,7 +26,7 @@
 
 //constants
 #define WIFI_PRESENT	true
-#define GPS_PRESENT		false
+#define GPS_PRESENT		true
 #define SHOW_WIFI_PACKETS false
 #define SHOW_WIFI_TX true
 #define SHOW_WIFI_RX true

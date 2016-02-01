@@ -39,10 +39,10 @@ void gps_l80_mikro_init() {
   buffer_size = 0;
 
   //initialize the mikro bus
-  mikro_enable_reset();
-  mikro_enable_uart(9600);
-  mikro_enable_interrupt(&gps_l80_mikro_interrupt_handler);
-  mikro_reset();
+  mikro_enable_reset(DEV2);
+  mikro_enable_uart(DEV2, 9600);
+  mikro_enable_interrupt(DEV2, &gps_l80_mikro_interrupt_handler);
+  mikro_reset(DEV2);
 }
 
 void gps_parse_buffer() {
