@@ -6,6 +6,7 @@
  */
 
 #include "dsrc.h"
+#include "math.h"
 
 //*****************************************************************************
 //
@@ -37,6 +38,10 @@ uint8_t  tx_socket_handle = 0xFF;
 //table to keep track of every device and their location
 DSRC_DEVICE device_table[16];
 uint8_t device_table_size = 0;
+
+//keep track of the last known self location
+uint32_t latitude = 0;
+uint32_t longitude = 0;
 
 //interrupt handler for switches
 void port_f_handler() {
@@ -131,28 +136,58 @@ int main(void) {
       WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from = malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
       while(wifi_get_recv_from_packet(recv_from) == true) {
 
-        //check if ip already exists in device table
-        //bool found = false;
-        //for(int i = 0; i < device_table_size; i++) {
-        //  if(memcmp(recv_from->remote_ip, device_table[i].ip, 4*sizeof(uint8_t)) == 0) {
-        //    memcpy(device_table[i].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
-        //    device_table[i].timeout = 0;
-        //    found = true;
-        //    break;
-        //  }
-        //}
-        //
-        ////add the device if it doesn't already exist
-        //if(found == false) {
-        //  memcpy(device_table[device_table_size].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
-        //  device_table[device_table_size].hb = malloc(sizeof(DSRC_HEARTBEAT));
-        //  memcpy(device_table[device_table_size].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
-        //  device_table[device_table_size].trust = 1;
-        //  device_table[device_table_size].timeout = 0;
-        //  device_table_size++;
-        //}
+        //only modify the device table if we know our current location
+        if(latitude != 0 && longitude != 0) {
 
-        //print_device_table();
+          //determine the index to place the heartbeat into the device table
+          int index;
+          for(index = 0; index < device_table_size; index++){
+            if(memcmp(recv_from->remote_ip, device_table[index].ip, 4*sizeof(uint8_t)) == 0) {
+              break;
+            }
+          }
+
+          //copy the heartbeat into the table
+          if(index >= device_table_size) {
+            device_table[index].hb = malloc(sizeof(DSRC_HEARTBEAT));
+          }
+          memcpy(device_table[index].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
+          memcpy(device_table[index].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
+          device_table[index].timeout = 0;
+
+          //update the table size
+          if(index+1 > device_table_size) {
+            device_table_size = index+1;
+          }
+
+          int16_t their_lat = device_table[index].hb->lat % 100;
+          int16_t their_lon = device_table[index].hb->lon % 100;
+          int16_t my_lat = latitude % 100;
+          int16_t my_lon = longitude % 100;
+
+          //compute angle and put in packet
+          int16_t angle = atan((their_lat-my_lat)/(their_lon-my_lon))*180/M_PI;
+          if(their_lon < my_lon) {
+            angle += 180;
+          }
+          else if(their_lat < my_lat) {
+            angle += 360;
+          }
+
+          //determine if the angle is close to the actual
+          if(abs(angle - recv_from->dir) < GPS_TOLERANCE_360) {
+            if(device_table[index].trust < 5) {
+              device_table[index].trust++;
+            }
+          }
+          else {
+            if(device_table[index].trust > -5) {
+              device_table[index].trust--;
+            }
+          }
+
+          print_device_table();
+        }
 
         //free the packet
         free(recv_from->data);
@@ -169,23 +204,25 @@ int main(void) {
 
       //transmit socket is ready
       if(tx_socket_handle != 0xFF) {
-        send_heartbeat();
+
+        //if we know our current location
+        if(latitude != 0 && longitude != 0) {
+          send_heartbeat();
+        }
       }
       #endif
 
       #if GPS_PRESENT
-      uint32_t lat;
-      uint32_t lon;
       NMEA_STATUS ret = NMEA_VAL_OK;
-      ret |= gps_l80_get_latitude(&lat);
-      ret |= gps_l80_get_longitude(&lon);
+      ret |= gps_l80_get_latitude(&latitude);
+      ret |= gps_l80_get_longitude(&longitude);
       if(ret == NMEA_VAL_INVALID) {
-        con_println("Error retrieving GPS location");
+        //con_println("Error retrieving GPS location");
       }
       else {
-        char str[256];
-        sprintf(str, "lat: %lu, lon: %lu", lat, lon);
-        con_println(str);
+        //char str[256];
+        //sprintf(str, "lat: %lu, lon: %lu", latitude, longitude);
+        //con_println(str);
       }
       #endif
 
@@ -222,12 +259,13 @@ void print_device_table() {
   con_println("DEVICE TABLE:");
   char str[256];
   for(int i = 0; i < device_table_size; i++) {
-    sprintf(str, "%s: %lu, %lu", device_table[i].hb->name,
+    sprintf(str, "%s: %lu, %lu - trust: %d", device_table[i].hb->name,
         device_table[i].hb->lat,
-        device_table[i].hb->lon);
+        device_table[i].hb->lon,
+        device_table[i].trust);
     con_println(str);
   }
-  con_println("");
+  con_printf("\n");
 }
 
 void send_heartbeat() {
@@ -235,8 +273,8 @@ void send_heartbeat() {
   //send different data depending on the device selected
   DSRC_HEARTBEAT *hb = malloc(sizeof(DSRC_HEARTBEAT));
   memset(hb, 0, sizeof(DSRC_HEARTBEAT));
-  hb->lat = 32;
-  hb->lon = 94;
+  hb->lat = latitude;
+  hb->lon = longitude;
   if(DEVICE == GREEN_DEVICE) {
     strcpy(hb->name, "green");
   }

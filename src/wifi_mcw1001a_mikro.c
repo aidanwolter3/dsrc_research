@@ -11,6 +11,7 @@
 #include "mikro.h"
 #include "task_manager.h"
 #include "queue.h"
+#include "math.h"
 
 //buffer that holds all received characters until 0x45
 //should be private
@@ -243,6 +244,7 @@ bool wifi_get_recv_from_packet(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *recv_from)
   if(packet == NULL) {
     return false;
   }
+
   memcpy(recv_from, packet, sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
   free(packet);
   return true;
@@ -262,29 +264,22 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
 
   //PHASED ARRAY SIMULATION
   //send the current location at the front of the data
-  uint32_t loc[2];
-  loc[0] = 32;
-  loc[1] = 94;
-  //NMEA_STATUS ret = NMEA_VAL_OK;
-  //ret |= gps_l80_get_latitude(&loc[0]);
-  //ret |= gps_l80_get_longitude(&loc[1]);
-  //if(ret == NMEA_VAL_OK) {
-    uint8_t *newdata = malloc(sizeof(loc)+len);
-    memcpy(newdata, loc, sizeof(loc));
-    memcpy(newdata+sizeof(loc), data, len);
-    data = newdata;
-    len = len + sizeof(loc);
-  //}
+  uint32_t my_loc[2] = {0};
+  gps_l80_get_latitude(&my_loc[0]);
+  gps_l80_get_longitude(&my_loc[1]);
+  uint8_t *packet_data = malloc((22+sizeof(my_loc)+len));
 
-  uint8_t *packet_data = malloc((22+len)*sizeof(uint8_t));
   packet_data[0] = socket_handle;
   packet_data[2] = remote_port & 0xFF;
   packet_data[3] = (remote_port >> 8) & 0xFF;
-  memcpy(packet_data+4, remote_ip, 16*sizeof(uint8_t));
-  packet_data[20] = len & 0xFF;
-  packet_data[21] = (len >> 8) & 0xFF;
-  memcpy(packet_data+22, data, len*sizeof(uint8_t));
-  wifi_send_basic_packet(WIFI_PACKET_TYPE_SOCKET_SEND_TO_MSG, WIFI_PACKET_TYPE_NONE, 22+len, packet_data);
+  memcpy(packet_data+4, remote_ip, 16);
+
+  //PHASED ARRAY SIMULATION
+  packet_data[20] = (len+sizeof(my_loc)) & 0xFF;
+  packet_data[21] = ((len+sizeof(my_loc)) >> 8) & 0xFF;
+  memcpy(packet_data+22, my_loc, sizeof(my_loc));
+  memcpy(packet_data+22+sizeof(my_loc), data, len*sizeof(uint8_t));
+  wifi_send_basic_packet(WIFI_PACKET_TYPE_SOCKET_SEND_TO_MSG, WIFI_PACKET_TYPE_NONE, 22+sizeof(my_loc)+len, packet_data);
 
   //print what was transmitted
   #if SHOW_WIFI_TX
@@ -294,11 +289,11 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
                                              remote_ip[2],
                                              remote_ip[3]);
   int i;
-  for(i = 0; i < len; i++) {
+  for(i = 0; i < len+sizeof(my_loc); i++) {
     sprintf(str+strlen(str), "%x ", packet_data[22+i]);
   }
   sprintf(str+strlen(str), "; ");
-  for(i = 0; i < len; i++) {
+  for(i = 0; i < len+sizeof(my_loc); i++) {
     sprintf(str+strlen(str), "%c", packet_data[22+i]);
   }
   con_println(str);
@@ -594,18 +589,38 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
         return PACKET_LENGTH_INVALID;
       }
 
-      uint32_t loc[2];
-
       WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE *packet = (WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE*)malloc(sizeof(WIFI_PACKET_SOCKET_RECV_FROM_RESPONSE));
       memcpy(packet, p->data, 22*sizeof(uint8_t));
+      packet->dir = 361; // start with impossible angle to show error
       
       //PHASED ARRAY SIMULATION
       //copy the simulated phased array data and determine the angle of arrival
-      memcpy(loc, p->data+22, sizeof(loc));
-      packet->dir = 45;
+      uint32_t their_loc[2];
+      memcpy(their_loc, p->data+22, sizeof(their_loc));
 
-      packet->data = (uint8_t*)malloc(packet->size*sizeof(uint8_t) - sizeof(loc));
-      memcpy(packet->data, p->data+22+sizeof(loc), packet->size);
+      //get my current location
+      uint32_t my_loc[2];
+      gps_l80_get_latitude(&my_loc[0]);
+      gps_l80_get_longitude(&my_loc[1]);
+      int16_t their_lat = their_loc[0] % 100;
+      int16_t their_lon = their_loc[1] % 100;
+      int16_t my_lat = my_loc[0] % 100;
+      int16_t my_lon = my_loc[1] % 100;
+
+      //compute angle and put in packet
+      int16_t angle = atan((their_lat-my_lat)/(their_lon-my_lon))*180/M_PI;
+      if(their_lon < my_lon) {
+        angle += 180;
+      }
+      else if(their_lat < my_lat) {
+        angle += 360;
+      }
+      packet->dir = (uint16_t)angle;
+
+      packet->size = packet->size - sizeof(their_loc);
+      packet->data = (uint8_t*)malloc(packet->size);
+      memcpy(packet->data, p->data+22+sizeof(their_loc), packet->size);
+
       if(!queue_full(&recv_from_buffer)) {
         queue_push(&recv_from_buffer, packet);
       }

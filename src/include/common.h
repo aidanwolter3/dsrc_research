@@ -28,8 +28,8 @@
 #define WIFI_PRESENT	true
 #define GPS_PRESENT		true
 #define SHOW_WIFI_PACKETS false
-#define SHOW_WIFI_TX true
-#define SHOW_WIFI_RX true
+#define SHOW_WIFI_TX false
+#define SHOW_WIFI_RX false
 
 #define GREEN_DEVICE 0x1
 #define BLUE_DEVICE 0x2
@@ -44,6 +44,10 @@
 #define BLUE_LED  GPIO_PIN_2
 #define GREEN_LED GPIO_PIN_3
 
+//the tolerance allowed for the stated angle and the calculated angle out of 360 degrees
+#define GPS_TOLERANCE_360 4
+
+#define M_PI        3.14159265358979323846264338327950288   /* pi             */
 
 //macros
 #define bitset(b) (1 << (b))

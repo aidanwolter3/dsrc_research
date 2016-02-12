@@ -70,6 +70,12 @@ bool gps_l80_get_latitude(uint32_t *lat) {
   }
 
   *lat = gprmc_record.latitude;
+  //if(DEVICE == GREEN_DEVICE) {
+  //  *lat = 32469600;
+  //}
+  //else {
+  //  *lat = 32469610;
+  //}
   return NMEA_VAL_OK;
 }
 
@@ -81,6 +87,12 @@ bool gps_l80_get_longitude(uint32_t *lon) {
   }
 
   *lon = gprmc_record.longitude;
+  //if(DEVICE == GREEN_DEVICE) {
+  //  *lon = 94059073;
+  //}
+  //else {
+  //  *lon = 94059083;
+  //}
   return NMEA_VAL_OK;
 }
 

@@ -13,7 +13,7 @@ typedef struct {
 typedef struct {
   uint8_t         ip[4];
   DSRC_HEARTBEAT *hb;
-  uint8_t         trust;
+  int8_t          trust;
   uint8_t         timeout;
 } DSRC_DEVICE;
 
