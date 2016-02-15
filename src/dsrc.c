@@ -36,7 +36,7 @@ uint8_t  rx_socket_handle = 0xFF;
 uint8_t  tx_socket_handle = 0xFF;
 
 //table to keep track of every device and their location
-DSRC_DEVICE device_table[16];
+DSRC_DEVICE device_table[MAX_TRACKED_DEVICES];
 uint8_t device_table_size = 0;
 
 //keep track of the last known self location
@@ -139,52 +139,61 @@ int main(void) {
         //only modify the device table if we know our current location
         if(latitude != 0 && longitude != 0) {
 
-          //determine the index to place the heartbeat into the device table
-          int index;
-          for(index = 0; index < device_table_size; index++){
-            if(memcmp(recv_from->remote_ip, device_table[index].ip, 4*sizeof(uint8_t)) == 0) {
-              break;
+          if(recv_from->data[0] == 0xAA) {
+
+            //determine the index to place the heartbeat into the device table
+            uint8_t index;
+            for(index = 0; index < device_table_size; index++) {
+              if(memcmp(recv_from->remote_ip, device_table[index].ip, 4*sizeof(uint8_t)) == 0) {
+                break;
+              }
             }
-          }
 
-          //copy the heartbeat into the table
-          if(index >= device_table_size) {
-            device_table[index].hb = malloc(sizeof(DSRC_HEARTBEAT));
-          }
-          memcpy(device_table[index].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
-          memcpy(device_table[index].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
-          device_table[index].timeout = 0;
-
-          //update the table size
-          if(index+1 > device_table_size) {
-            device_table_size = index+1;
-          }
-
-          int16_t their_lat = device_table[index].hb->lat % 100;
-          int16_t their_lon = device_table[index].hb->lon % 100;
-          int16_t my_lat = latitude % 100;
-          int16_t my_lon = longitude % 100;
-
-          //compute angle and put in packet
-          int16_t angle = atan((their_lat-my_lat)/(their_lon-my_lon))*180/M_PI;
-          if(their_lon < my_lon) {
-            angle += 180;
-          }
-          else if(their_lat < my_lat) {
-            angle += 360;
-          }
-
-          //determine if the angle is close to the actual
-          if(abs(angle - recv_from->dir) < GPS_TOLERANCE_360) {
-            if(device_table[index].trust < 5) {
-              device_table[index].trust++;
+            //copy the heartbeat into the table
+            if(index >= device_table_size) {
+              device_table[index].hb = malloc(sizeof(DSRC_HEARTBEAT));
             }
-          }
-          else {
-            if(device_table[index].trust > -5) {
-              device_table[index].trust--;
+            memcpy(device_table[index].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
+            memcpy(device_table[index].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
+            device_table[index].timeout = 0;
+
+            //update the table size
+            if(index+1 > device_table_size) {
+              device_table_size = index+1;
             }
+
+            int16_t their_lat = ((uint32_t)device_table[index].hb->lat) % 100;
+            int16_t their_lon = ((uint32_t)device_table[index].hb->lon) % 100;
+            int16_t my_lat = latitude % 100;
+            int16_t my_lon = longitude % 100;
+
+            //compute angle and put in packet
+            int16_t angle = atan((their_lat-my_lat)/(their_lon-my_lon))*180/M_PI;
+            if(their_lon < my_lon) {
+              angle += 180;
+            }
+            else if(their_lat < my_lat) {
+              angle += 360;
+            }
+
+            //determine if the angle is close to the actual
+            if(abs(angle - recv_from->dir) < GPS_TOLERANCE_360) {
+              if(device_table[index].trust < 5) {
+                device_table[index].trust++;
+              }
+            }
+            else {
+              if(device_table[index].trust > -5) {
+                device_table[index].trust--;
+              }
+            }
+            send_device_trust(index);
           }
+
+          //received a device trust packet
+          else if(recv_from->data[0] == 0xBB) {
+          }
+
 
           print_device_table();
         }
@@ -268,11 +277,22 @@ void print_device_table() {
   con_printf("\n");
 }
 
+void send_device_trust(uint8_t device_index) {
+  DSRC_DEVICE_TRUST dt;
+  memset(&dt, 0, sizeof(DSRC_DEVICE_TRUST));
+  dt.id = 0xBB;
+  memcpy(dt.ip, device_table[device_index].ip, sizeof(dt.ip));
+  dt.trust = device_table[device_index].trust;
+
+  wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_DEVICE_TRUST), (uint8_t*)&dt);
+}
+
 void send_heartbeat() {
 
   //send different data depending on the device selected
   DSRC_HEARTBEAT *hb = malloc(sizeof(DSRC_HEARTBEAT));
   memset(hb, 0, sizeof(DSRC_HEARTBEAT));
+  hb->id = 0xAA;
   hb->lat = latitude;
   hb->lon = longitude;
   if(DEVICE == GREEN_DEVICE) {

@@ -283,7 +283,7 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
 
   //print what was transmitted
   #if SHOW_WIFI_TX
-  char str[256];
+  char *str = (char*)malloc(len+sizeof(my_loc)+100);
   sprintf(str, "tx {%02x.%02x.%02x.%02x}: ", remote_ip[0],
                                              remote_ip[1],
                                              remote_ip[2],
@@ -297,6 +297,7 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
     sprintf(str+strlen(str), "%c", packet_data[22+i]);
   }
   con_println(str);
+  free(str);
   #endif
 
   free(packet_data);
@@ -627,7 +628,7 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
 
       //print what was received
       #if SHOW_WIFI_RX
-      char *str = malloc(256*sizeof(char));
+      char *str = malloc(packet->size+100);
       sprintf(str, "rx {%02x.%02x.%02x.%02x}, %d°: ", packet->remote_ip[0],
                                                      packet->remote_ip[1],
                                                      packet->remote_ip[2],

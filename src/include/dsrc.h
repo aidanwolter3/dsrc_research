@@ -4,10 +4,19 @@
 #include "wifi_mcw1001a_mikro.h"
 #include "task_manager.h"
 
+#define MAX_TRACKED_DEVICES 20
+
 typedef struct {
-  char     name[16];
-  uint32_t lat;
-  uint32_t lon;
+  uint32_t  id;
+  uint8_t   ip[4];
+  int8_t    trust;
+} DSRC_DEVICE_TRUST;
+
+typedef struct {
+  uint32_t   id;
+  char       name[16];
+  uint32_t   lat;
+  uint32_t   lon;
 } DSRC_HEARTBEAT;
 
 typedef struct {
@@ -18,6 +27,7 @@ typedef struct {
 } DSRC_DEVICE;
 
 void print_device_table();
+void send_device_trust(uint8_t device_index);
 void send_heartbeat();
 void wifi_configure();
 void wifi_start();
