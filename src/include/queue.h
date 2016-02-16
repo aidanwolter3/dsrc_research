@@ -1,3 +1,6 @@
+#ifndef QUEUE_H_
+#define QUEUE_H_
+
 #include <stdlib.h>
 
 typedef struct {
@@ -19,7 +22,6 @@ void queue_alloc(queue *q, int size) {
 }
 void queue_free(queue *q) {
   free(q->arr);
-  return;
 }
 bool queue_empty(queue *q) {
   return q->cnt == 0;
@@ -36,7 +38,6 @@ void queue_push(queue *q, void *obj) {
   }
   q->arr[q->en] = obj;
   q->cnt++;
-  return;
 }
 void* queue_pop(queue *q) {
   if(queue_empty(q)) {
@@ -50,3 +51,4 @@ void* queue_pop(queue *q) {
   return obj;
 }
 
+#endif

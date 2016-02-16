@@ -6,7 +6,6 @@
  */
 
 #include "dsrc.h"
-#include "math.h"
 
 //*****************************************************************************
 //
@@ -34,10 +33,6 @@ uint16_t rx_remote_port   = 10003;
 uint16_t tx_remote_port   = 10002;
 uint8_t  rx_socket_handle = 0xFF;
 uint8_t  tx_socket_handle = 0xFF;
-
-//table to keep track of every device and their location
-DSRC_DEVICE device_table[MAX_TRACKED_DEVICES];
-uint8_t device_table_size = 0;
 
 //keep track of the last known self location
 uint32_t latitude = 0;
@@ -74,6 +69,9 @@ int main(void) {
   else if(DEVICE == BLUE_DEVICE) {
     con_println("Blue");
   }
+
+  //initialize the device table
+  device_table_init(MAX_TRACKED_DEVICES);
 
   //first determine who we are (GREEN or BLUE)
   if(DEVICE == GREEN_DEVICE) {
@@ -141,29 +139,23 @@ int main(void) {
 
           if(recv_from->data[0] == 0xAA) {
 
-            //determine the index to place the heartbeat into the device table
-            uint8_t index;
-            for(index = 0; index < device_table_size; index++) {
-              if(memcmp(recv_from->remote_ip, device_table[index].ip, 4*sizeof(uint8_t)) == 0) {
-                break;
-              }
+            //determine if the device already exists in the table and allocate space if it doesn't
+            DSRC_DEVICE *dev = device_table_get(recv_from->remote_ip);
+            if(dev == NULL) {
+              dev = (DSRC_DEVICE*)malloc(sizeof(DSRC_DEVICE));
+              device_table_put(dev);
             }
 
-            //copy the heartbeat into the table
-            if(index >= device_table_size) {
-              device_table[index].hb = malloc(sizeof(DSRC_HEARTBEAT));
-            }
-            memcpy(device_table[index].ip, recv_from->remote_ip, 4*sizeof(uint8_t));
-            memcpy(device_table[index].hb, recv_from->data, sizeof(DSRC_HEARTBEAT));
-            device_table[index].timeout = 0;
+            //copy the device into the table
+            DSRC_HEARTBEAT* hb = (DSRC_HEARTBEAT*)(recv_from->data);
+            memcpy(dev->ip, recv_from->remote_ip, 4*sizeof(uint8_t));
+            memcpy(dev->name, hb->name, sizeof(dev->name));
+            dev->lat = hb->lat;
+            dev->lon = hb->lon;
+            dev->timeout = 0;
 
-            //update the table size
-            if(index+1 > device_table_size) {
-              device_table_size = index+1;
-            }
-
-            int16_t their_lat = ((uint32_t)device_table[index].hb->lat) % 100;
-            int16_t their_lon = ((uint32_t)device_table[index].hb->lon) % 100;
+            int16_t their_lat = ((uint32_t)dev->lat) % 100;
+            int16_t their_lon = ((uint32_t)dev->lon) % 100;
             int16_t my_lat = latitude % 100;
             int16_t my_lon = longitude % 100;
 
@@ -178,24 +170,19 @@ int main(void) {
 
             //determine if the angle is close to the actual
             if(abs(angle - recv_from->dir) < GPS_TOLERANCE_360) {
-              if(device_table[index].trust < 5) {
-                device_table[index].trust++;
-              }
+              dev->self_trust = 1;
             }
             else {
-              if(device_table[index].trust > -5) {
-                device_table[index].trust--;
-              }
+              dev->self_trust = 0;
             }
-            send_device_trust(index);
+            send_device_trust(dev);
           }
 
           //received a device trust packet
           else if(recv_from->data[0] == 0xBB) {
           }
 
-
-          print_device_table();
+          device_table_print();
         }
 
         //free the packet
@@ -264,25 +251,12 @@ int main(void) {
   }
 }
 
-void print_device_table() {
-  con_println("DEVICE TABLE:");
-  char str[256];
-  for(int i = 0; i < device_table_size; i++) {
-    sprintf(str, "%s: %lu, %lu - trust: %d", device_table[i].hb->name,
-        device_table[i].hb->lat,
-        device_table[i].hb->lon,
-        device_table[i].trust);
-    con_println(str);
-  }
-  con_printf("\n");
-}
-
-void send_device_trust(uint8_t device_index) {
+void send_device_trust(DSRC_DEVICE *dev) {
   DSRC_DEVICE_TRUST dt;
   memset(&dt, 0, sizeof(DSRC_DEVICE_TRUST));
   dt.id = 0xBB;
-  memcpy(dt.ip, device_table[device_index].ip, sizeof(dt.ip));
-  dt.trust = device_table[device_index].trust;
+  memcpy(dt.ip, dev->ip, sizeof(dt.ip));
+  dt.trust = dev->self_trust;
 
   wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_DEVICE_TRUST), (uint8_t*)&dt);
 }

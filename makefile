@@ -13,6 +13,8 @@ SOURCES	+= mikro.c
 SOURCES += wifi_mcw1001a_mikro.c
 SOURCES += gps_l80_mikro.c
 SOURCES += task_manager.c
+SOURCES += device_table.c
+SOURCES += list.c
 
 #SOURCES  = $(wildcard src/*.c)
 
