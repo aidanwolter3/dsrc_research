@@ -9,7 +9,7 @@ void device_table_init(uint8_t size) {
 void* device_table_get(uint8_t *ip) {
   int index = 0;
   for(index = 0; index < device_table.size; index++) {
-    if(memcmp((DSRC_DEVICE*)(device_table.arr[index]), ip, 4) == 0) {
+    if(memcmp(((DSRC_DEVICE*)(device_table.arr[index]))->ip, ip, 4) == 0) {
       break;
     }
   }
@@ -24,7 +24,15 @@ void device_table_put(DSRC_DEVICE *dev) {
 }
 
 void device_table_update() {
-  //check all timeouts
+  for(int i = 0; i < device_table.size; i++) {
+    if(device_table.arr[i] != NULL) {
+      ((DSRC_DEVICE*)device_table.arr[i])->timeout--;
+
+      if(((DSRC_DEVICE*)device_table.arr[i])->timeout <= 0) {
+        list_remove(&device_table, device_table.arr[i]);
+      }
+    }
+  }
 }
 
 void device_table_print() {
@@ -32,9 +40,10 @@ void device_table_print() {
   char str[256];
   for(int i = 0; i < device_table.size; i++) {
     if(device_table.arr[i] != NULL) {
-      sprintf(str, "%s: %lu, %lu - self_trust: %d", ((DSRC_DEVICE*)device_table.arr[i])->name,
+      sprintf(str, "%s: %lu, %lu (%d) - self_trust: %d", ((DSRC_DEVICE*)device_table.arr[i])->name,
           ((DSRC_DEVICE*)device_table.arr[i])->lat,
           ((DSRC_DEVICE*)device_table.arr[i])->lon,
+          ((DSRC_DEVICE*)device_table.arr[i])->timeout,
           ((DSRC_DEVICE*)device_table.arr[i])->self_trust);
       con_println(str);
     }

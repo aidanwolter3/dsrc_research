@@ -28,8 +28,8 @@
 #define WIFI_PRESENT	true
 #define GPS_PRESENT		true
 #define SHOW_WIFI_PACKETS false
-#define SHOW_WIFI_TX true
-#define SHOW_WIFI_RX true
+#define SHOW_WIFI_TX false
+#define SHOW_WIFI_RX false
 
 #define GREEN_DEVICE 0x1
 #define BLUE_DEVICE 0x2

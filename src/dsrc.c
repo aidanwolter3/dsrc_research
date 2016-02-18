@@ -152,7 +152,7 @@ int main(void) {
             memcpy(dev->name, hb->name, sizeof(dev->name));
             dev->lat = hb->lat;
             dev->lon = hb->lon;
-            dev->timeout = 0;
+            dev->timeout = DEVICE_TIMEOUT;
 
             int16_t their_lat = ((uint32_t)dev->lat) % 100;
             int16_t their_lon = ((uint32_t)dev->lon) % 100;
@@ -176,13 +176,14 @@ int main(void) {
               dev->self_trust = 0;
             }
             send_device_trust(dev);
+
+            device_table_print();
           }
 
           //received a device trust packet
           else if(recv_from->data[0] == 0xBB) {
           }
 
-          device_table_print();
         }
 
         //free the packet
@@ -195,6 +196,9 @@ int main(void) {
 
     //1Hz timer
     if(isbitset(events, TASK_EVENT_TIMER0) == true) {
+
+      //decrement the timeouts in the device table
+      device_table_update();
 
       #if WIFI_PRESENT
 

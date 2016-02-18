@@ -34,12 +34,11 @@ void list_add(list *l, void *obj) {
 void list_remove(list *l, void *obj) {
   int index = 0;
   for(index = 0; index < l->size; index++) {
-    if(l->arr[index] == NULL) {
+    if(l->arr[index] == obj) {
+      free(obj);
+      l->arr[index] = NULL;
       break;
     }
-  }
-  if(index < l->size) {
-    l->arr[index] = NULL;
   }
 }
 

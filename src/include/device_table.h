@@ -5,6 +5,8 @@
 #include "console.h"
 #include "list.h"
 
+#define DEVICE_TIMEOUT 5
+
 typedef struct {
   uint8_t         ip[4];
   char            name[16];
