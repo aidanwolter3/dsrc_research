@@ -17,6 +17,12 @@ void __error__(char *pcFilename, uint32_t ui32Line) {
 }
 #endif
 
+//control system parameters
+#define SELF_WEIGHTED_TRUST 14
+#define OTHERS_WEIGHTED_TRUST 10
+#define OTHERS_MIN_TRUST 2
+#define MINIMUM_ACC_TRUST 30
+
 //wifi configurations
 WIFI_NETWORK_MODE network_mode = WIFI_NETWORK_MODE_ADHOC;
 uint8_t channels[]    = {1,2,3,4,5,6,7,8,9,10,11};
@@ -49,6 +55,9 @@ void port_f_handler() {
   GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0|GPIO_PIN_4);
 }
 
+//keep track of how many seconds have passed for the heartbeat packet id
+uint32_t hz_count = 0;
+
 int main(void) {
 
   //enable lazy stacking so floating-point instruction can be used in interrupt handlers
@@ -69,6 +78,9 @@ int main(void) {
   else if(DEVICE == BLUE_DEVICE) {
     con_println("Blue");
   }
+  else if(DEVICE == RED_DEVICE) {
+    con_println("Red");
+  }
 
   //initialize the device table
   device_table_init(MAX_TRACKED_DEVICES);
@@ -79,6 +91,9 @@ int main(void) {
   }
   else if(DEVICE == BLUE_DEVICE) {
     device_color = BLUE_LED;
+  }
+  else if(DEVICE == RED_DEVICE) {
+    device_color = RED_LED;
   }
 
   //initialize the led
@@ -150,9 +165,14 @@ int main(void) {
             DSRC_HEARTBEAT* hb = (DSRC_HEARTBEAT*)(recv_from->data);
             memcpy(dev->ip, recv_from->remote_ip, 4*sizeof(uint8_t));
             memcpy(dev->name, hb->name, sizeof(dev->name));
+            dev->last_hb_id = hb->packet_id;
             dev->lat = hb->lat;
             dev->lon = hb->lon;
             dev->timeout = DEVICE_TIMEOUT;
+
+            //clear the used neighbors
+            dev->used_neighbors_cnt = 0;
+            memset(dev->used_neighbors, 0, sizeof(dev->used_neighbors));
 
             int16_t their_lat = ((uint32_t)dev->lat) % 100;
             int16_t their_lon = ((uint32_t)dev->lon) % 100;
@@ -170,18 +190,54 @@ int main(void) {
 
             //determine if the angle is close to the actual
             if(abs(angle - recv_from->dir) < GPS_TOLERANCE_360) {
-              dev->self_trust = 1;
+              dev->self_trust = 10;
+              dev->computed_trust = SELF_WEIGHTED_TRUST;
             }
             else {
               dev->self_trust = 0;
+              dev->computed_trust = 0;
             }
-            send_device_trust(dev);
+            send_device_trust(dev, hb->packet_id);
 
             device_table_print();
           }
 
           //received a device trust packet
           else if(recv_from->data[0] == 0xBB) {
+            DSRC_DEVICE_TRUST *trust = (DSRC_DEVICE_TRUST*)(recv_from->data);
+            
+            //ignore the recommendation of they don't trust the device
+            if(trust->trust != 0) {
+              con_println("one");
+              DSRC_DEVICE *recommender = device_table_get(recv_from->remote_ip);
+              DSRC_DEVICE *dev = device_table_get(trust->ip);
+
+              //only use the opinions of others if we know about the device they are recommending
+              //and the device that is recommending
+              if(dev != NULL && recommender != NULL) {
+                con_println("two");
+
+                //see if we have already used the opinion of this neighbor
+                bool neighbor_already_used = false;
+                for(int i = 0; i < dev->used_neighbors_cnt; i++) {
+                  if(dev->used_neighbors[i] == 0) {
+                    break;
+                  }
+                  if(memcmp(&(dev->used_neighbors[i]), trust->ip, sizeof(trust->ip) == 0)) {
+                    neighbor_already_used = true;
+                    break;
+                  }
+                }
+
+                if(!neighbor_already_used) {
+                  con_println("three");
+                  uint8_t weighted_opinion = min(recommender->computed_trust / MINIMUM_ACC_TRUST + OTHERS_MIN_TRUST, 10) * OTHERS_WEIGHTED_TRUST;
+                  dev->computed_trust += weighted_opinion;
+                  memcpy(&(dev->used_neighbors[dev->used_neighbors_cnt]), trust->ip, sizeof(trust->ip));
+                  dev->used_neighbors_cnt++;
+                }
+              }
+            }
           }
 
         }
@@ -196,6 +252,7 @@ int main(void) {
 
     //1Hz timer
     if(isbitset(events, TASK_EVENT_TIMER0) == true) {
+      hz_count = (hz_count + 1) % 60; // for some reason if the count goes up too high, we don't receive any more heartbeats
 
       //decrement the timeouts in the device table
       device_table_update();
@@ -206,9 +263,9 @@ int main(void) {
       if(tx_socket_handle != 0xFF) {
 
         //if we know our current location
-        if(latitude != 0 && longitude != 0) {
+        //if(latitude != 0 && longitude != 0) {
           send_heartbeat();
-        }
+        //}
       }
       #endif
 
@@ -255,9 +312,10 @@ int main(void) {
   }
 }
 
-void send_device_trust(DSRC_DEVICE *dev) {
+void send_device_trust(DSRC_DEVICE *dev, uint32_t hb_packet_id) {
   DSRC_DEVICE_TRUST dt;
   memset(&dt, 0, sizeof(DSRC_DEVICE_TRUST));
+  dt.hb_packet_id = hb_packet_id;
   dt.id = 0xBB;
   memcpy(dt.ip, dev->ip, sizeof(dt.ip));
   dt.trust = dev->self_trust;
@@ -270,14 +328,18 @@ void send_heartbeat() {
   //send different data depending on the device selected
   DSRC_HEARTBEAT *hb = malloc(sizeof(DSRC_HEARTBEAT));
   memset(hb, 0, sizeof(DSRC_HEARTBEAT));
+  hb->packet_id = hz_count;
   hb->id = 0xAA;
   hb->lat = latitude;
   hb->lon = longitude;
   if(DEVICE == GREEN_DEVICE) {
     strcpy(hb->name, "green");
   }
-  else {
+  else if(DEVICE == BLUE_DEVICE) {
     strcpy(hb->name, "blue");
+  }
+  else if(DEVICE == RED_DEVICE) {
+    strcpy(hb->name, "red");
   }
 
   wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_HEARTBEAT), (uint8_t*)hb);

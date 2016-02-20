@@ -28,16 +28,20 @@
 #define WIFI_PRESENT	true
 #define GPS_PRESENT		true
 #define SHOW_WIFI_PACKETS false
-#define SHOW_WIFI_TX false
-#define SHOW_WIFI_RX false
+#define SHOW_WIFI_TX true
+#define SHOW_WIFI_RX true
 
 #define GREEN_DEVICE 0x1
 #define BLUE_DEVICE 0x2
+#define RED_DEVICE 0x3
 #ifdef SELECT_GREEN_DEVICE
   #define DEVICE GREEN_DEVICE
 #endif
 #ifdef SELECT_BLUE_DEVICE
   #define DEVICE BLUE_DEVICE
+#endif
+#ifdef SELECT_RED_DEVICE
+  #define DEVICE RED_DEVICE
 #endif
 
 #define RED_LED   GPIO_PIN_1
@@ -54,6 +58,7 @@
 #define bitclear(b) (~(1 << (b)))
 #define isbitset(v,b) (((v & bitset(b)) != 0) ? true : false)
 #define isbitclear(v,b) (((v | ~bitset(b)) == 0) ? true : false)
+#define min(a,b) ((a) < (b) ? (a) : (b))
 
 //procedures
 

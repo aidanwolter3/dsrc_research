@@ -40,11 +40,12 @@ void device_table_print() {
   char str[256];
   for(int i = 0; i < device_table.size; i++) {
     if(device_table.arr[i] != NULL) {
-      sprintf(str, "%s: %lu, %lu (%d) - self_trust: %d", ((DSRC_DEVICE*)device_table.arr[i])->name,
+      sprintf(str, "%s: %lu, %lu (%d) - self_trust: %d - computed_trust: %d", ((DSRC_DEVICE*)device_table.arr[i])->name,
           ((DSRC_DEVICE*)device_table.arr[i])->lat,
           ((DSRC_DEVICE*)device_table.arr[i])->lon,
           ((DSRC_DEVICE*)device_table.arr[i])->timeout,
-          ((DSRC_DEVICE*)device_table.arr[i])->self_trust);
+          ((DSRC_DEVICE*)device_table.arr[i])->self_trust,
+          ((DSRC_DEVICE*)device_table.arr[i])->computed_trust);
       con_println(str);
     }
   }

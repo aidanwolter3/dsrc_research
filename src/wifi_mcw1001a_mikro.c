@@ -292,10 +292,11 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
   for(i = 0; i < len+sizeof(my_loc); i++) {
     sprintf(str+strlen(str), "%x ", packet_data[22+i]);
   }
-  sprintf(str+strlen(str), "; ");
-  for(i = 0; i < len+sizeof(my_loc); i++) {
-    sprintf(str+strlen(str), "%c", packet_data[22+i]);
-  }
+  //sprintf(str+strlen(str), "; ");
+  //for(i = 0; i < len+sizeof(my_loc); i++) {
+  //  sprintf(str+strlen(str), "%c", packet_data[22+i]);
+  //}
+
   con_println(str);
   free(str);
   #endif
@@ -638,10 +639,10 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       for(i = 0; i < packet->size; i++) {
         sprintf(str+strlen(str), "%x ", packet->data[i]);
       }
-      sprintf(str+strlen(str), "; ");
-      for(i = 0; i < packet->size; i++) {
-        sprintf(str+strlen(str), "%c", packet->data[i]);
-      }
+      //sprintf(str+strlen(str), "; ");
+      //for(i = 0; i < packet->size; i++) {
+      //  sprintf(str+strlen(str), "%c", packet->data[i]);
+      //}
       con_println(str);
       free(str);
       #endif

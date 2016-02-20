@@ -13,19 +13,20 @@
 
 typedef struct {
   uint32_t  id;
+  uint32_t  hb_packet_id;
   uint8_t   ip[4];
   int8_t    trust;
-  uint8_t   computed_trust;
 } DSRC_DEVICE_TRUST;
 
 typedef struct {
   uint32_t   id;
+  uint32_t   packet_id;
   char       name[16];
   uint32_t   lat;
   uint32_t   lon;
 } DSRC_HEARTBEAT;
 
-void send_device_trust(DSRC_DEVICE *dev);
+void send_device_trust(DSRC_DEVICE *dev, uint32_t hb_packet_id);
 void send_heartbeat();
 void wifi_configure();
 void wifi_start();
