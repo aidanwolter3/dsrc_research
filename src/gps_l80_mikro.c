@@ -63,36 +63,49 @@ void gps_parse_buffer() {
 }
 
 bool gps_l80_get_latitude(uint32_t *lat) {
-  gps_l80_mikro_records_update();
+  //gps_l80_mikro_records_update();
 
-  if((gprmc_record.valid_values & bitset(GPRMC_VAL_LATITUDE)) == 0) {
-    return NMEA_VAL_INVALID;
+  //if((gprmc_record.valid_values & bitset(GPRMC_VAL_LATITUDE)) == 0) {
+  //  return NMEA_VAL_INVALID;
+  //}
+
+  //*lat = gprmc_record.latitude;
+  if(DEVICE == GREEN_DEVICE) {
+    *lat = 32469600;
+  }
+  else if(DEVICE == BLUE_DEVICE) {
+    *lat = 32469610;
+  }
+  else if(DEVICE == RED_DEVICE) {
+    *lat = 32469620;
+  }
+  else if(DEVICE == WHITE_DEVICE) {
+    *lat = 32469630;
   }
 
-  *lat = gprmc_record.latitude;
-  //if(DEVICE == GREEN_DEVICE) {
-  //  *lat = 32469600;
-  //}
-  //else {
-  //  *lat = 32469610;
-  //}
   return NMEA_VAL_OK;
 }
 
 bool gps_l80_get_longitude(uint32_t *lon) {
-  gps_l80_mikro_records_update();
+  //gps_l80_mikro_records_update();
 
-  if((gprmc_record.valid_values & bitset(GPRMC_VAL_LONGITUDE)) == 0) {
-    return NMEA_VAL_INVALID;
+  //if((gprmc_record.valid_values & bitset(GPRMC_VAL_LONGITUDE)) == 0) {
+  //  return NMEA_VAL_INVALID;
+  //}
+
+  //*lon = gprmc_record.longitude;
+  if(DEVICE == GREEN_DEVICE) {
+    *lon = 94059063;
   }
-
-  *lon = gprmc_record.longitude;
-  //if(DEVICE == GREEN_DEVICE) {
-  //  *lon = 94059073;
-  //}
-  //else {
-  //  *lon = 94059083;
-  //}
+  else if(DEVICE == BLUE_DEVICE) {
+    *lon = 94059073;
+  }
+  else if(DEVICE == RED_DEVICE) {
+    *lon = 94059083;
+  }
+  else if(DEVICE == WHITE_DEVICE) {
+    *lon = 94059093;
+  }
   return NMEA_VAL_OK;
 }
 

@@ -31,9 +31,27 @@
 #define SHOW_WIFI_TX true
 #define SHOW_WIFI_RX true
 
-#define GREEN_DEVICE 0x1
-#define BLUE_DEVICE 0x2
+//delays to accommodate for receiving UDP hardware limitations
+//#define TX_REPEAT_CNT 3
+//#ifdef SELECT_GREEN_DEVICE
+//  #define TX_REPEAT_DELAY 16000000/16*1
+//#endif
+//#ifdef SELECT_BLUE_DEVICE
+//  #define TX_REPEAT_DELAY 16000000/16*2
+//#endif
+//#ifdef SELECT_RED_DEVICE
+//  #define TX_REPEAT_DELAY 16000000/16*3
+//#endif
+//#ifdef SELECT_WHITE_DEVICE
+//  #define TX_REPEAT_DELAY 16000000/16*5
+//#endif
+
+
+//selecting the device
+#define GREEN_DEVICE 0x2
+#define BLUE_DEVICE 0x4
 #define RED_DEVICE 0x3
+#define WHITE_DEVICE 0x1
 #ifdef SELECT_GREEN_DEVICE
   #define DEVICE GREEN_DEVICE
 #endif
@@ -43,10 +61,16 @@
 #ifdef SELECT_RED_DEVICE
   #define DEVICE RED_DEVICE
 #endif
+#ifdef SELECT_WHITE_DEVICE
+  #define DEVICE WHITE_DEVICE
+#endif
 
+
+//led colors
 #define RED_LED   GPIO_PIN_1
 #define BLUE_LED  GPIO_PIN_2
 #define GREEN_LED GPIO_PIN_3
+#define WHITE_LED GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3
 
 //the tolerance allowed for the stated angle and the calculated angle out of 360 degrees
 #define GPS_TOLERANCE_360 4
@@ -62,6 +86,9 @@
 
 //procedures
 
+void delay_us(uint32_t us);
+void delay_ms(uint32_t ms);
+void delay_s(uint32_t s);
 
 //modified strtok that takes into account empty strings
 //courtesy of http://www.tek-tips.com/viewthread.cfm?qid=294161

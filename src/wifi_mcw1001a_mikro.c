@@ -58,7 +58,7 @@ void wifi_init() {
   memset(buffer, 0, BUFFER_SIZE*BUFFER_MAX_PACKET_SIZE);
 
   //initialize the recv_from_buffer
-  queue_alloc(&recv_from_buffer, 10);
+  queue_alloc(&recv_from_buffer, 40);
 
   //initialize the data
   memset(&wifi_network_status, 0, sizeof(WIFI_PACKET_NETWORK_STATUS));
@@ -279,8 +279,14 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
   packet_data[21] = ((len+sizeof(my_loc)) >> 8) & 0xFF;
   memcpy(packet_data+22, my_loc, sizeof(my_loc));
   memcpy(packet_data+22+sizeof(my_loc), data, len*sizeof(uint8_t));
-  wifi_send_basic_packet(WIFI_PACKET_TYPE_SOCKET_SEND_TO_MSG, WIFI_PACKET_TYPE_NONE, 22+sizeof(my_loc)+len, packet_data);
 
+
+  //send repeated messages with a delay to reduce collisions
+  //for(int tx_cnt = 0; tx_cnt < TX_REPEAT_CNT; tx_cnt++) {
+    //SysCtlDelay(TX_REPEAT_DELAY);
+    wifi_send_basic_packet(WIFI_PACKET_TYPE_SOCKET_SEND_TO_MSG, WIFI_PACKET_TYPE_SOCKET_SEND_TO_RESPONSE_MSG, 22+sizeof(my_loc)+len, packet_data);
+  //}
+  
   //print what was transmitted
   #if SHOW_WIFI_TX
   char *str = (char*)malloc(len+sizeof(my_loc)+100);
@@ -404,6 +410,7 @@ void wifi_put_packet(WIFI_PACKET *p) {
   memcpy(data+6, p->data, p->len);
   data[6+(p->len)] = 0x45;
 
+  //transmit multiple times with delays to prevent collisions
   for(int i = 0; i < (7+(p->len)); i++) {
     UARTCharPut(UART2_BASE, data[i]);
   }

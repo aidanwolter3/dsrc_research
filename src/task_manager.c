@@ -63,6 +63,7 @@ void task_clear_event(TASK_EVENT e) {
   }
 }
 
+
 void task_wait_for_event(TASK_EVENT e) {
   while(isbitset(task_events, e) == true);
 }

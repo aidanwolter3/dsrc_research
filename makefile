@@ -120,6 +120,10 @@ red: clean
 red: CFLAGS += -DSELECT_RED_DEVICE
 red: flash
 
+white: clean
+white: CFLAGS += -DSELECT_WHITE_DEVICE
+white: flash
+
 screen: flash
 	screen /dev/tty.usbmodem0E20F341 115200
 

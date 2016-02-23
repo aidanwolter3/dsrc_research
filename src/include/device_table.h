@@ -5,7 +5,7 @@
 #include "console.h"
 #include "list.h"
 
-#define DEVICE_TIMEOUT  5
+#define DEVICE_TIMEOUT  200
 #define MAX_NEIGHBORS   20
 
 typedef struct {

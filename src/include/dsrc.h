@@ -19,6 +19,12 @@ typedef struct {
 } DSRC_DEVICE_TRUST;
 
 typedef struct {
+  uint32_t  id;
+  uint8_t   ip[4];
+  int8_t    computed_trust;
+} DSRC_DEVICE_TRUST_REPORT;
+
+typedef struct {
   uint32_t   id;
   uint32_t   packet_id;
   char       name[16];

@@ -7,6 +7,16 @@
 
 #include "common.h"
 
+void delay_us(uint32_t us) {
+  SysCtlDelay(us*16/3);
+}
+void delay_ms(uint32_t ms) {
+  SysCtlDelay(ms*16000/3);
+}
+void delay_s(uint32_t s) {
+  SysCtlDelay(s*16000000/3);
+}
+
 //modified strtok that takes into account empty strings
 //courtesy of http://www.tek-tips.com/viewthread.cfm?qid=294161
 char* xstrtok(char *line, char *delims) {
