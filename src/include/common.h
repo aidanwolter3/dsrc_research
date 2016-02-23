@@ -28,24 +28,11 @@
 #define WIFI_PRESENT	true
 #define GPS_PRESENT		true
 #define SHOW_WIFI_PACKETS false
-#define SHOW_WIFI_TX true
-#define SHOW_WIFI_RX true
+#define SHOW_WIFI_TX false
+#define SHOW_WIFI_RX false
 
 //delays to accommodate for receiving UDP hardware limitations
-//#define TX_REPEAT_CNT 3
-//#ifdef SELECT_GREEN_DEVICE
-//  #define TX_REPEAT_DELAY 16000000/16*1
-//#endif
-//#ifdef SELECT_BLUE_DEVICE
-//  #define TX_REPEAT_DELAY 16000000/16*2
-//#endif
-//#ifdef SELECT_RED_DEVICE
-//  #define TX_REPEAT_DELAY 16000000/16*3
-//#endif
-//#ifdef SELECT_WHITE_DEVICE
-//  #define TX_REPEAT_DELAY 16000000/16*5
-//#endif
-
+#define TX_REPEAT_CNT 3
 
 //selecting the device
 #define GREEN_DEVICE 0x2

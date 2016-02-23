@@ -213,8 +213,9 @@ int main(void) {
                 dev->self_trust = 0;
                 dev->computed_trust = 0;
               }
-              if(DEVICE != BLUE_DEVICE) {
-                delay_ms(100*DEVICE);
+              uint8_t test_ip[] = {169,254,1,1};
+              if(DEVICE != BLUE_DEVICE && memcmp(dev->ip, test_ip, sizeof(dev->ip)) == 0) {
+                //delay_ms(100*DEVICE);
                 send_device_trust(dev, hb->packet_id);
               }
             }
@@ -226,38 +227,35 @@ int main(void) {
             
             //ignore the recommendation if they don't trust the device
             if(trust->trust != 0) {
-              //DSRC_DEVICE *recommender = device_table_get(recv_from->remote_ip);
+              DSRC_DEVICE *recommender = device_table_get(recv_from->remote_ip);
               DSRC_DEVICE *dev = device_table_get(trust->ip);
 
               //only continue if the packet id matches
               if(trust->hb_packet_id == dev->last_hb_id) {
 
                 //only use the opinions of others if we know about the device they are recommending
-                //and the device that is recommending
-                //if(recommender != NULL) {
+                //and the device that is doing the recommending
+                if(recommender != NULL) {
                   if(dev != NULL) {
 
                     //see if we have already used the opinion of this neighbor
-                    //bool neighbor_already_used = false;
-                    //for(int i = 0; i < dev->used_neighbors_cnt; i++) {
-                    //  if(dev->used_neighbors[i] == 0) {
-                    //    break;
-                    //  }
-                    //  if(memcmp(&(dev->used_neighbors[i]), recommender->ip, sizeof(trust->ip) == 0)) {
-                    //    neighbor_already_used = true;
-                    //    break;
-                    //  }
-                    //}
+                    bool neighbor_already_used = false;
+                    for(int i = 0; i < dev->used_neighbors_cnt; i++) {
+                      if(memcmp(&(dev->used_neighbors[i]), recommender->ip, sizeof(recommender->ip)) == 0) {
+                        neighbor_already_used = true;
+                        break;
+                      }
+                    }
 
-                    //if(!neighbor_already_used) {
+                    if(!neighbor_already_used) {
                       char str[256];
-                      sprintf(str, "got trust %s->%s", /*recommender->name*/"device", dev->name);
+                      sprintf(str, "got trust %s->%s", recommender->name, dev->name);
                       con_println(str);
 
-                      uint8_t weighted_opinion = min(/*recommender->computed_trust*/MINIMUM_ACC_TRUST / MINIMUM_ACC_TRUST + OTHERS_MIN_TRUST, 1) * OTHERS_WEIGHTED_TRUST;
+                      uint8_t weighted_opinion = min(recommender->computed_trust / MINIMUM_ACC_TRUST + OTHERS_MIN_TRUST, 1) * OTHERS_WEIGHTED_TRUST;
                       dev->computed_trust += weighted_opinion;
-                      //memcpy(&(dev->used_neighbors[dev->used_neighbors_cnt]), recommender->ip, sizeof(trust->ip));
-                      //dev->used_neighbors_cnt++;
+                      memcpy(&(dev->used_neighbors[dev->used_neighbors_cnt]), recommender->ip, sizeof(uint32_t));
+                      dev->used_neighbors_cnt++;
 
                       //report the new computed trust
                       //DSRC_DEVICE_TRUST_REPORT tr;
@@ -265,9 +263,9 @@ int main(void) {
                       //memcpy(tr.ip, dev->ip, sizeof(tr.ip));
                       //tr.computed_trust = dev->computed_trust;
                       //wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_DEVICE_TRUST_REPORT), (uint8_t*)&tr);
-                    //}
+                    }
                   }
-                //}
+                }
               }
             }
           }
@@ -377,7 +375,6 @@ void send_device_trust(DSRC_DEVICE *dev, uint32_t hb_packet_id) {
 }
 
 void send_heartbeat() {
-  if(DEVICE == WHITE_DEVICE) {
   con_println("");
 
   //send different data depending on the device selected
@@ -408,7 +405,6 @@ void send_heartbeat() {
 
   //clean up
   free(hb);
-  }
 
   device_table_print();
 }
