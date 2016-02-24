@@ -283,7 +283,7 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
 
   //send repeated messages with a delay to reduce collisions
   for(int tx_cnt = 0; tx_cnt < TX_REPEAT_CNT; tx_cnt++) {
-    delay_ms(100*DEVICE);
+    delay_ms(TX_REPEAT_DELAY*DEVICE);
     wifi_send_basic_packet(WIFI_PACKET_TYPE_SOCKET_SEND_TO_MSG, WIFI_PACKET_TYPE_SOCKET_SEND_TO_RESPONSE_MSG, 22+sizeof(my_loc)+len, packet_data);
   }
   

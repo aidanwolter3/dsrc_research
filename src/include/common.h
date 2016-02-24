@@ -33,12 +33,13 @@
 
 //delays to accommodate for receiving UDP hardware limitations
 #define TX_REPEAT_CNT 3
+#define TX_REPEAT_DELAY 100
 
 //selecting the device
+#define BLUE_DEVICE 0x1
 #define GREEN_DEVICE 0x2
-#define BLUE_DEVICE 0x4
 #define RED_DEVICE 0x3
-#define WHITE_DEVICE 0x1
+#define WHITE_DEVICE 0x4
 #ifdef SELECT_GREEN_DEVICE
   #define DEVICE GREEN_DEVICE
 #endif

@@ -213,9 +213,8 @@ int main(void) {
                 dev->self_trust = 0;
                 dev->computed_trust = 0;
               }
-              uint8_t test_ip[] = {169,254,1,1};
+              uint8_t test_ip[] = {169,254,1,WHITE_DEVICE};
               if(DEVICE != BLUE_DEVICE && memcmp(dev->ip, test_ip, sizeof(dev->ip)) == 0) {
-                //delay_ms(100*DEVICE);
                 send_device_trust(dev, hb->packet_id);
               }
             }
@@ -252,17 +251,17 @@ int main(void) {
                       sprintf(str, "got trust %s->%s", recommender->name, dev->name);
                       con_println(str);
 
-                      uint8_t weighted_opinion = min(recommender->computed_trust / MINIMUM_ACC_TRUST + OTHERS_MIN_TRUST, 1) * OTHERS_WEIGHTED_TRUST;
+                      uint8_t weighted_opinion = min((recommender->computed_trust * OTHERS_WEIGHTED_TRUST / MINIMUM_ACC_TRUST) + 2, OTHERS_WEIGHTED_TRUST);
                       dev->computed_trust += weighted_opinion;
                       memcpy(&(dev->used_neighbors[dev->used_neighbors_cnt]), recommender->ip, sizeof(uint32_t));
                       dev->used_neighbors_cnt++;
 
                       //report the new computed trust
-                      //DSRC_DEVICE_TRUST_REPORT tr;
-                      //tr.id = 0xCC;
-                      //memcpy(tr.ip, dev->ip, sizeof(tr.ip));
-                      //tr.computed_trust = dev->computed_trust;
-                      //wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_DEVICE_TRUST_REPORT), (uint8_t*)&tr);
+                      DSRC_DEVICE_TRUST_REPORT tr;
+                      tr.id = 0xCC;
+                      memcpy(tr.ip, dev->ip, sizeof(tr.ip));
+                      tr.computed_trust = dev->computed_trust;
+                      wifi_socket_send_to(tx_socket_handle, tx_remote_port, remote_ip, sizeof(DSRC_DEVICE_TRUST_REPORT), (uint8_t*)&tr);
                     }
                   }
                 }
