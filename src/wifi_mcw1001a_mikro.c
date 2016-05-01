@@ -268,6 +268,8 @@ void wifi_socket_send_to(uint8_t socket_handle, uint16_t remote_port, uint8_t *r
   gps_l80_get_latitude(&my_loc[0]);
   gps_l80_get_longitude(&my_loc[1]);
   uint8_t *packet_data = malloc((22+sizeof(my_loc)+len));
+  //my_loc[0] += rand()%GPS_USUAL_ERROR-GPS_USUAL_ERROR/2;
+  //my_loc[1] += rand()%GPS_USUAL_ERROR-GPS_USUAL_ERROR/2;
 
   packet_data[0] = socket_handle;
   packet_data[2] = remote_port & 0xFF;
@@ -410,7 +412,6 @@ void wifi_put_packet(WIFI_PACKET *p) {
   memcpy(data+6, p->data, p->len);
   data[6+(p->len)] = 0x45;
 
-  //transmit multiple times with delays to prevent collisions
   for(int i = 0; i < (7+(p->len)); i++) {
     UARTCharPut(UART2_BASE, data[i]);
   }
@@ -472,7 +473,7 @@ void wifi_print_packet(WIFI_PACKET *p) {
     
     int i;
     for(i = 0; i < p->len; i++) {
-      sprintf(str+strlen(str), "0x%x ", p->data[i]); // crashing here
+      sprintf(str+strlen(str), "0x%x ", p->data[i]);
     }
 
     sprintf(str+strlen(str), "}");
@@ -611,20 +612,26 @@ PACKET_STATUS wifi_process_packet(WIFI_PACKET *p) {
       uint32_t my_loc[2];
       gps_l80_get_latitude(&my_loc[0]);
       gps_l80_get_longitude(&my_loc[1]);
-      int16_t their_lat = their_loc[0] % 100;
-      int16_t their_lon = their_loc[1] % 100;
-      int16_t my_lat = my_loc[0] % 100;
-      int16_t my_lon = my_loc[1] % 100;
+      int16_t their_lat = their_loc[0] % 10000;
+      int16_t their_lon = their_loc[1] % 10000;
+      int16_t my_lat = my_loc[0] % 10000;
+      int16_t my_lon = my_loc[1] % 10000;
 
       //compute angle and put in packet
-      int16_t angle = atan((their_lat-my_lat)/(their_lon-my_lon))*180/M_PI;
+      char str3[100];
+      sprintf(str3, "coords: %d, %d, %d, %d", their_lat, their_lon, my_lat, my_lon);
+      con_println(str3);
+      int16_t angle = (int16_t)(atan((float)(their_lat-my_lat)/(float)(their_lon-my_lon))*180/M_PI);
       if(their_lon < my_lon) {
         angle += 180;
       }
       else if(their_lat < my_lat) {
         angle += 360;
       }
+
       packet->dir = (uint16_t)angle;
+      sprintf(str3, "coords: %d, %d, %d, %d, %d, %d", their_lat, their_lon, my_lat, my_lon, angle, packet->dir);
+      con_println(str3);
 
       packet->size = packet->size - sizeof(their_loc);
       packet->data = (uint8_t*)malloc(packet->size);

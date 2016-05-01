@@ -61,7 +61,8 @@
 #define WHITE_LED GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3
 
 //the tolerance allowed for the stated angle and the calculated angle out of 360 degrees
-#define GPS_TOLERANCE_360 4
+#define GPS_TOLERANCE_360 14 // ALPHA
+#define GPS_USUAL_ERROR 27
 
 #define M_PI        3.14159265358979323846264338327950288   /* pi             */
 
@@ -71,6 +72,7 @@
 #define isbitset(v,b) (((v & bitset(b)) != 0) ? true : false)
 #define isbitclear(v,b) (((v | ~bitset(b)) == 0) ? true : false)
 #define min(a,b) ((a) < (b) ? (a) : (b))
+#define max(a,b) ((a) > (b) ? (a) : (b))
 
 //procedures
 

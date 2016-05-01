@@ -63,49 +63,49 @@ void gps_parse_buffer() {
 }
 
 bool gps_l80_get_latitude(uint32_t *lat) {
-  //gps_l80_mikro_records_update();
+  gps_l80_mikro_records_update();
 
-  //if((gprmc_record.valid_values & bitset(GPRMC_VAL_LATITUDE)) == 0) {
-  //  return NMEA_VAL_INVALID;
+  if((gprmc_record.valid_values & bitset(GPRMC_VAL_LATITUDE)) == 0) {
+    return NMEA_VAL_INVALID;
+  }
+
+  *lat = gprmc_record.latitude;
+  //if(DEVICE == GREEN_DEVICE) {
+  //  *lat = 32469600;
   //}
-
-  //*lat = gprmc_record.latitude;
-  if(DEVICE == GREEN_DEVICE) {
-    *lat = 32469600;
-  }
-  else if(DEVICE == BLUE_DEVICE) {
-    *lat = 32469610;
-  }
-  else if(DEVICE == RED_DEVICE) {
-    *lat = 32469620;
-  }
-  else if(DEVICE == WHITE_DEVICE) {
-    *lat = 32469630;
-  }
+  //else if(DEVICE == BLUE_DEVICE) {
+  //  *lat = 32469750;
+  //}
+  //else if(DEVICE == RED_DEVICE) {
+  //  *lat = 32469900;
+  //}
+  //else if(DEVICE == WHITE_DEVICE) {
+  //  *lat = 32470050;
+  //}
 
   return NMEA_VAL_OK;
 }
 
 bool gps_l80_get_longitude(uint32_t *lon) {
-  //gps_l80_mikro_records_update();
+  gps_l80_mikro_records_update();
 
-  //if((gprmc_record.valid_values & bitset(GPRMC_VAL_LONGITUDE)) == 0) {
-  //  return NMEA_VAL_INVALID;
+  if((gprmc_record.valid_values & bitset(GPRMC_VAL_LONGITUDE)) == 0) {
+    return NMEA_VAL_INVALID;
+  }
+
+  *lon = gprmc_record.longitude;
+  //if(DEVICE == GREEN_DEVICE) {
+  //  *lon = 94059000;
   //}
-
-  //*lon = gprmc_record.longitude;
-  if(DEVICE == GREEN_DEVICE) {
-    *lon = 94059063;
-  }
-  else if(DEVICE == BLUE_DEVICE) {
-    *lon = 94059073;
-  }
-  else if(DEVICE == RED_DEVICE) {
-    *lon = 94059083;
-  }
-  else if(DEVICE == WHITE_DEVICE) {
-    *lon = 94059093;
-  }
+  //else if(DEVICE == BLUE_DEVICE) {
+  //  *lon = 94059150;
+  //}
+  //else if(DEVICE == RED_DEVICE) {
+  //  *lon = 94059300;
+  //}
+  //else if(DEVICE == WHITE_DEVICE) {
+  //  *lon = 94059450;
+  //}
   return NMEA_VAL_OK;
 }
 
@@ -123,14 +123,14 @@ bool gps_l80_get_time_stamp(uint32_t *time_stamp) {
 
 void gps_l80_mikro_records_update() {
 
-  //interate of every dirty record string
+  //iterate of every dirty record string
   uint32_t type;
   for(type = 0; type < NMEA_TYPE_COUNT; type++) {
     if((nmea_record_dirty_strings & bitset(type)) != 0) {
 
       //set up the parsing
-      NMEA_PARSE_STATE  state = NMEA_FIELD_VAL;
-      uint8_t   val_state = 0;
+      NMEA_PARSE_STATE state = NMEA_FIELD_VAL;
+      uint8_t val_state = 0;
 
       //parse every field in the record string
       uint16_t ptr = 0;

@@ -91,6 +91,7 @@ void mikro_enable_interrupt(DEV dev, void (*handler)()) {
   }
 }
 
+//caused crashing
 void mikro_reset(DEV dev) {
   if(dev == DEV1) {
     GPIOPinWrite(GPIO_PORTA_BASE, GPIO_PIN_5, 0);
